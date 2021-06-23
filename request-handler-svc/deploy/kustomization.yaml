@@ -4,5 +4,5 @@ resources:
 # - deployment-client.yaml
 - service.yaml
 - serviceaccount.yaml
-- clusterrole.yaml
-- clusterrolebinding.yaml
+# - clusterrole.yaml
+# - clusterrolebinding.yaml
