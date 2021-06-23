@@ -17,8 +17,12 @@
 package shield
 
 import (
+	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 
 	k8smnfconfig "github.com/IBM/integrity-shield/admission-controller/pkg/config"
 	log "github.com/sirupsen/logrus"
@@ -31,6 +35,53 @@ import (
 
 const defaultPodNamespace = "k8s-manifest-sigstore"
 const defaultIshieldConfigName = "integrity-shield-config"
+const remoteRequestHandlerURL = "https://integrity-shield-api.k8s-manifest-sigstore.svc:8123/api/request"
+
+func RequestHandlerController(remote bool, req admission.Request, paramObj *k8smnfconfig.ParameterObject) *ResultFromRequestHandler {
+	r := &ResultFromRequestHandler{}
+	if remote {
+		log.Info("[DEBUG] remote request handler ", remoteRequestHandlerURL)
+		// http call to remote request handler service
+		input := &RemoteRequestHandlerInputMap{
+			Request:   req,
+			Parameter: *paramObj,
+		}
+		inputjson, _ := json.Marshal(input)
+		transCfg := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // ignore expired SSL certificates
+		}
+		client := &http.Client{Transport: transCfg}
+		res, err := client.Post(remoteRequestHandlerURL, "application/json", bytes.NewBuffer([]byte(inputjson)))
+		if err != nil {
+			log.Error("Error reported from Remote RequestHandler", err.Error())
+			r.Message = err.Error()
+			return r
+		}
+		if res.StatusCode != 200 {
+			log.Error("Error reported from Remote RequestHandler: statusCode is not 200")
+			r.Message = "Error reported from Remote RequestHandler"
+			return r
+		}
+		body, err := ioutil.ReadAll(res.Body)
+		if err != nil {
+			log.Error("error: fail to read body: ", err)
+			r.Message = err.Error()
+			return r
+		}
+		err = json.Unmarshal([]byte(string(body)), &r)
+		if err != nil {
+			log.Error("error: fail to Unmarshal: ", err)
+			r.Message = err.Error()
+			return r
+		}
+		log.Info("[DEBUG] Response from remote request handler ", r)
+		return r
+	} else {
+		// local request handler
+		r = RequestHandler(req, paramObj)
+	}
+	return r
+}
 
 func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObject) *ResultFromRequestHandler {
 	// unmarshal admission request object
@@ -101,8 +152,8 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 			}
 			if isUpdateRequest {
 				// TODO: mutation check for update request
-				isMuated := checkIgnoreFields(result.Diff, paramObj.IgnoreFields)
-				if !isMuated {
+				isMutated := checkIgnoreFields(result.Diff, paramObj.IgnoreFields)
+				if !isMutated {
 					allow = true
 					message = "no mutation found"
 				}
@@ -143,4 +194,9 @@ func isUpdateRequest(operation v1.Operation) bool {
 
 func checkIgnoreFields(diff *mapnode.DiffResult, ignoreFields k8smanifest.ObjectFieldBindingList) bool {
 	return true
+}
+
+type RemoteRequestHandlerInputMap struct {
+	Request   admission.Request            `json:"request,omitempty"`
+	Parameter k8smnfconfig.ParameterObject `json:"parameters,omitempty"`
 }
