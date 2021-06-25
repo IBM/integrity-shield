@@ -3,17 +3,26 @@ module github.com/IBM/integrity-shield/admission-controller
 go 1.16
 
 require (
-	github.com/ghodss/yaml v1.0.0
+	github.com/fatih/color v1.12.0 // indirect
+	github.com/jinzhu/copier v0.3.2
+	github.com/onsi/ginkgo v1.16.4 // indirect
+	github.com/onsi/gomega v1.13.0 // indirect
 	github.com/pkg/errors v0.9.1
+	github.com/sigstore/cosign v0.4.1-0.20210602105506-5cb21aa7fbf9 // indirect
 	github.com/sirupsen/logrus v1.8.1
 	github.com/yuji-watanabe-jp/k8s-manifest-sigstore v0.0.0-20210617041144-9d27c6cc6d34
+	golang.org/x/tools v0.1.2 // indirect
 	k8s.io/api v0.21.1
+	k8s.io/apiextensions-apiserver v0.21.1 // indirect
 	k8s.io/apimachinery v0.21.1
 	k8s.io/client-go v0.21.1
 	sigs.k8s.io/controller-runtime v0.9.0
 )
 
 replace (
+	github.com/IBM/integrity-enforcer/cmd => ../../integrity-enforcer/cmd
+	github.com/IBM/integrity-enforcer/controller => ../../integrity-enforcer/controller
+	github.com/IBM/integrity-enforcer/shield => ../../integrity-enforcer/shield
 	github.com/IBM/integrity-shield/admission-controller => ./
 	github.com/sigstore/cosign => github.com/sigstore/cosign v0.4.1-0.20210602105506-5cb21aa7fbf9
 	k8s.io/api => k8s.io/api v0.19.0
@@ -26,3 +35,7 @@ replace (
 	k8s.io/kubectl => k8s.io/kubectl v0.19.0
 	sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.8.3
 )
+
+replace github.com/docker/docker => github.com/moby/moby v0.7.3-0.20190826074503-38ab9da00309 // Required by Helm
+
+replace github.com/openshift/api => github.com/openshift/api v0.0.0-20190924102528-32369d4db2ad // Required until https://github.com/operator-framework/operator-lifecycle-manager/pull/1241 is resolved

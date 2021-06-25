@@ -17,92 +17,87 @@
 package config
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
 	"strings"
 
-	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 
-	"github.com/yuji-watanabe-jp/k8s-manifest-sigstore/pkg/k8smanifest"
-	k8smnfutil "github.com/yuji-watanabe-jp/k8s-manifest-sigstore/pkg/util"
+	"github.com/IBM/integrity-shield/admission-controller/pkg/apis/manifestintegrityprofile/v1alpha1"
+	miprofile "github.com/IBM/integrity-shield/admission-controller/pkg/apis/manifestintegrityprofile/v1alpha1"
+	mipclient "github.com/IBM/integrity-shield/admission-controller/pkg/client/manifestintegrityprofile/clientset/versioned/typed/manifestintegrityprofile/v1alpha1"
 	"github.com/yuji-watanabe-jp/k8s-manifest-sigstore/pkg/util/kubeutil"
 	v1 "k8s.io/api/core/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const configKeyInConfigMap = "config.yaml"
-
-type ConstraintObject struct {
-	Match      k8smanifest.ObjectReferenceList `json:"match,omitempty"` // TODO: same structure with gatekeeper?
-	Parameters ParameterObject                 `json:"parameters,omitempty"`
-}
-
-type ParameterObject struct {
-	k8smanifest.VerifyOption `json:""`
-	InScopeObjects           k8smanifest.ObjectReferenceList `json:"inScopeObjects,omitempty"`
-	SkipUsers                ObjectUserBindingList           `json:"skipUsers,omitempty"`
-	KeySecertName            string                          `json:"keySecretName,omitempty"`
-	KeySecertNamespace       string                          `json:"keySecretNamespace,omitempty"`
-	ImageRef                 string                          `json:"imageRef,omitempty"`
-}
-
-type ObjectUserBindingList []ObjectUserBinding
-
-type ObjectUserBinding struct {
-	Objects k8smanifest.ObjectReferenceList `json:"objects,omitempty"`
-	Users   []string                        `json:"users,omitempty"`
-}
-
-func GetParametersFromConstraint(constraint ConstraintObject) *ParameterObject {
+func GetParametersFromConstraint(constraint v1alpha1.ManifestIntegrityProfileSpec) *miprofile.ParameterObject {
 	return &constraint.Parameters
 }
 
-func (l ObjectUserBindingList) Match(obj unstructured.Unstructured, username string) bool {
-	if len(l) == 0 {
-		return false
+func LoadConstraints() ([]v1alpha1.ManifestIntegrityProfileSpec, error) {
+	loadManifestIntegiryProfile()
+	manifestIntegrityProfileList, err := loadManifestIntegiryProfiles()
+	if err != nil {
+		return []v1alpha1.ManifestIntegrityProfileSpec{}, err
 	}
-	for _, u := range l {
-		if u.Match(obj, username) {
-			return true
-		}
+	if manifestIntegrityProfileList == nil {
+		return []v1alpha1.ManifestIntegrityProfileSpec{}, nil
 	}
-	return false
+	constraints := loadConstraintsFromProfileList(manifestIntegrityProfileList)
+	return constraints, nil
 }
 
-func (u ObjectUserBinding) Match(obj unstructured.Unstructured, username string) bool {
-	if u.Objects.Match(obj) {
-		if k8smnfutil.MatchWithPatternArray(username, u.Users) {
-			return true
-		}
+func loadConstraintsFromProfileList(miplist *v1alpha1.ManifestIntegrityProfileList) []v1alpha1.ManifestIntegrityProfileSpec {
+	var constraints []v1alpha1.ManifestIntegrityProfileSpec
+	for _, mip := range miplist.Items {
+		constraints = append(constraints, mip.Spec)
 	}
-	return false
+	return constraints
 }
 
-func LoadConfig(namespace, name string) (*ConstraintObject, error) {
-	obj, err := kubeutil.GetResource("v1", "ConfigMap", namespace, name)
+func loadManifestIntegiryProfile() (*v1alpha1.ManifestIntegrityProfile, error) {
+	// TODO: kubeconfig
+	config, err := kubeutil.GetKubeConfig()
 	if err != nil {
-		if k8serrors.IsNotFound(err) {
-			return nil, nil
-		}
-		return nil, errors.Wrap(err, fmt.Sprintf("failed to get a configmap `%s` in `%s` namespace", name, namespace))
+		return nil, err
 	}
-	objBytes, _ := json.Marshal(obj.Object)
-	var cm v1.ConfigMap
-	_ = json.Unmarshal(objBytes, &cm)
-	cfgBytes, found := cm.Data[configKeyInConfigMap]
-	if !found {
-		return nil, errors.New(fmt.Sprintf("`%s` is not found in configmap", configKeyInConfigMap))
-	}
-	var conf *ConstraintObject
-	err = yaml.Unmarshal([]byte(cfgBytes), &conf)
+
+	clientset, err := mipclient.NewForConfig(config)
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("failed to unmarshal config.yaml into %T", conf))
+		log.Error(err)
+		return nil, err
 	}
-	return conf, nil
+	mip, err := clientset.ManifestIntegrityProfiles().Get(context.Background(), "constraint-configmap", metav1.GetOptions{})
+	if err != nil {
+		log.Error("failed to get ManifestIntegrityProfiles:", err.Error())
+		return nil, err
+	}
+	return mip, nil
+}
+
+func loadManifestIntegiryProfiles() (*v1alpha1.ManifestIntegrityProfileList, error) {
+	// TODO: kubeconfig
+	config, err := kubeutil.GetKubeConfig()
+	if err != nil {
+		return nil, nil
+	}
+
+	clientset, err := mipclient.NewForConfig(config)
+	if err != nil {
+		log.Error(err)
+		return nil, nil
+	}
+	miplist, err := clientset.ManifestIntegrityProfiles().List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		log.Error("failed to get ManifestIntegrityProfiles:", err.Error())
+		return nil, nil
+	}
+	return miplist, nil
 }
 
 func LoadKeySecret(keySecertNamespace, keySecertName string) (string, error) {

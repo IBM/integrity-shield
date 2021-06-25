@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	miprofile "github.com/IBM/integrity-shield/admission-controller/pkg/apis/manifestintegrityprofile/v1alpha1"
 	k8smnfconfig "github.com/IBM/integrity-shield/admission-controller/pkg/config"
 	log "github.com/sirupsen/logrus"
 	"github.com/yuji-watanabe-jp/k8s-manifest-sigstore/pkg/k8smanifest"
@@ -37,7 +38,7 @@ const defaultPodNamespace = "k8s-manifest-sigstore"
 const defaultIshieldConfigName = "integrity-shield-config"
 const remoteRequestHandlerURL = "https://integrity-shield-api.k8s-manifest-sigstore.svc:8123/api/request"
 
-func RequestHandlerController(remote bool, req admission.Request, paramObj *k8smnfconfig.ParameterObject) *ResultFromRequestHandler {
+func RequestHandlerController(remote bool, req admission.Request, paramObj *miprofile.ParameterObject) *ResultFromRequestHandler {
 	r := &ResultFromRequestHandler{}
 	if remote {
 		log.Info("[DEBUG] remote request handler ", remoteRequestHandlerURL)
@@ -46,9 +47,10 @@ func RequestHandlerController(remote bool, req admission.Request, paramObj *k8sm
 			Request:   req,
 			Parameter: *paramObj,
 		}
+
 		inputjson, _ := json.Marshal(input)
 		transCfg := &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // ignore expired SSL certificates
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
 		client := &http.Client{Transport: transCfg}
 		res, err := client.Post(remoteRequestHandlerURL, "application/json", bytes.NewBuffer([]byte(inputjson)))
@@ -83,7 +85,7 @@ func RequestHandlerController(remote bool, req admission.Request, paramObj *k8sm
 	return r
 }
 
-func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObject) *ResultFromRequestHandler {
+func RequestHandler(req admission.Request, paramObj *miprofile.ParameterObject) *ResultFromRequestHandler {
 	// unmarshal admission request object
 	// load Resource from Admission request
 	var resource unstructured.Unstructured
@@ -197,6 +199,6 @@ func checkIgnoreFields(diff *mapnode.DiffResult, ignoreFields k8smanifest.Object
 }
 
 type RemoteRequestHandlerInputMap struct {
-	Request   admission.Request            `json:"request,omitempty"`
-	Parameter k8smnfconfig.ParameterObject `json:"parameters,omitempty"`
+	Request   admission.Request         `json:"request,omitempty"`
+	Parameter miprofile.ParameterObject `json:"parameters,omitempty"`
 }

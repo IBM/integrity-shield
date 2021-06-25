@@ -20,16 +20,18 @@ import (
 	"context"
 	"flag"
 	"os"
+	"strings"
 
-	k8smnfconfig "github.com/IBM/integrity-shield/admission-controller/pkg/config"
+	"github.com/IBM/integrity-shield/admission-controller/pkg/config"
 	"github.com/IBM/integrity-shield/admission-controller/pkg/shield"
 	log "github.com/sirupsen/logrus"
-	"github.com/yuji-watanabe-jp/k8s-manifest-sigstore/pkg/k8smanifest"
+	k8smnfutil "github.com/yuji-watanabe-jp/k8s-manifest-sigstore/pkg/util"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	corev1 "k8s.io/api/core/v1"
 
+	miprofile "github.com/IBM/integrity-shield/admission-controller/pkg/apis/manifestintegrityprofile/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -56,20 +58,17 @@ type k8sManifestHandler struct {
 	Client client.Client
 }
 
-func getPodNamespace() string {
-	ns := os.Getenv(podNamespaceEnvKey)
-	if ns == "" {
-		ns = defaultPodNamespace
-	}
-	return ns
+type AccumulatedResult struct {
+	Allow   bool
+	Message string
 }
 
 func (h *k8sManifestHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
 
 	log.Info("[DEBUG] request: ", req.Kind, ", ", req.Name)
 
-	//load config (constraint)
-	constraints, err := getConstraints()
+	// load constraints
+	constraints, err := config.LoadConstraints()
 	if err != nil {
 		log.Errorf("failed to load manifest integrity config; %s", err.Error())
 		return admission.Allowed("error but allow for development")
@@ -79,7 +78,7 @@ func (h *k8sManifestHandler) Handle(ctx context.Context, req admission.Request) 
 
 	for _, constraint := range constraints {
 
-		//TODO: match check: kind, namespace
+		//match check: kind, namespace
 		isMatched := matchCheck(req, constraint.Match)
 		if !isMatched {
 			r := shield.ResultFromRequestHandler{
@@ -90,18 +89,17 @@ func (h *k8sManifestHandler) Handle(ctx context.Context, req admission.Request) 
 			continue
 		}
 
-		//TODO: pick parameters from constaint
-		paramObj := k8smnfconfig.GetParametersFromConstraint(constraint)
+		// pick parameters from constaint
+		paramObj := config.GetParametersFromConstraint(constraint)
 
-		// TODO: call request handler
-		// TODO: receive result from request handler (allow, message)
+		// call request handler & receive result from request handler (allow, message)
 		r := shield.RequestHandlerController(useRemote, req, paramObj)
 		// r := shield.RequestHandler(req, paramObj)
 
 		results = append(results, *r)
 	}
 
-	// TODO: accumulate results from constraints
+	// accumulate results from constraints
 	ar := getAccumulatedResult(results)
 
 	// TODO: generate events
@@ -116,48 +114,58 @@ func (h *k8sManifestHandler) Handle(ctx context.Context, req admission.Request) 
 	}
 }
 
-func getConstraints() ([]k8smnfconfig.ConstraintObject, error) {
-	//TODO: constraintに変える
-	configNamespace := getPodNamespace()
-	configName := defaultManifestIntegrityConfigMapName
-	constraint, err := k8smnfconfig.LoadConfig(configNamespace, configName)
-	log.Info("[DEBUG] constraint: ", constraint)
-	constraints := []k8smnfconfig.ConstraintObject{}
-	if err == nil && constraint != nil {
-		constraints = append(constraints, *constraint)
+func matchCheck(req admission.Request, match miprofile.MatchCondition) bool {
+	// check if excludedNamespace
+	for _, ens := range match.ExcludedNamespaces {
+		if k8smnfutil.MatchPattern(ens, req.Namespace) {
+			return false
+		}
 	}
-	return constraints, err
-}
-
-type AccumulatedResult struct {
-	Allow   bool
-	Message string
-}
-
-func matchCheck(req admission.Request, match k8smanifest.ObjectReferenceList) bool {
-	// TODO: fix
-	if len(match) == 0 {
+	// check if matched kind/namespace
+	ns_matched := false
+	kind_matched := false
+	if len(match.Namespaces) == 0 {
+		ns_matched = true
+	} else {
+		// check if cluster scope
+		if req.Namespace == "" {
+			ns_matched = true
+		}
+		for _, ns := range match.Namespaces {
+			if k8smnfutil.MatchPattern(ns, req.Namespace) {
+				ns_matched = true
+			}
+		}
+	}
+	if len(match.Kinds) == 0 {
+		kind_matched = true
+	} else {
+		for _, ns := range match.Kinds {
+			if k8smnfutil.MatchPattern(ns, req.Kind.Kind) {
+				kind_matched = true
+			}
+		}
+	}
+	if ns_matched && kind_matched {
 		return true
-	}
-	for _, m := range match {
-		if m.Kind == "" {
-			return true
-		}
-		if m.Kind == req.Kind.Kind {
-			return true
-		}
 	}
 	return false
 }
 
 func getAccumulatedResult(results []shield.ResultFromRequestHandler) *AccumulatedResult {
+	deny_messages := []string{}
 	accumulatedRes := &AccumulatedResult{}
 	for _, result := range results {
 		if !result.Allow {
 			accumulatedRes.Allow = false
 			accumulatedRes.Message = result.Message
-			return accumulatedRes
+			deny_messages = append(deny_messages, result.Message)
 		}
+	}
+	if len(deny_messages) != 0 {
+		accumulatedRes.Allow = false
+		accumulatedRes.Message = strings.Join(deny_messages, ";")
+		return accumulatedRes
 	}
 	accumulatedRes.Allow = true
 	return accumulatedRes
