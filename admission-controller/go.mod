@@ -20,9 +20,6 @@ require (
 )
 
 replace (
-	github.com/IBM/integrity-enforcer/cmd => ../../integrity-enforcer/cmd
-	github.com/IBM/integrity-enforcer/controller => ../../integrity-enforcer/controller
-	github.com/IBM/integrity-enforcer/shield => ../../integrity-enforcer/shield
 	github.com/IBM/integrity-shield/admission-controller => ./
 	github.com/sigstore/cosign => github.com/sigstore/cosign v0.4.1-0.20210602105506-5cb21aa7fbf9
 	k8s.io/api => k8s.io/api v0.19.0
@@ -35,7 +32,3 @@ replace (
 	k8s.io/kubectl => k8s.io/kubectl v0.19.0
 	sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.8.3
 )
-
-replace github.com/docker/docker => github.com/moby/moby v0.7.3-0.20190826074503-38ab9da00309 // Required by Helm
-
-replace github.com/openshift/api => github.com/openshift/api v0.0.0-20190924102528-32369d4db2ad // Required until https://github.com/operator-framework/operator-lifecycle-manager/pull/1241 is resolved
