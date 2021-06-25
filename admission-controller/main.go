@@ -47,9 +47,6 @@ var (
 )
 
 const tlsDir = `/run/secrets/tls`
-const podNamespaceEnvKey = "POD_NAMESPACE"
-const defaultPodNamespace = "k8s-manifest-sigstore"
-const defaultManifestIntegrityConfigMapName = "k8s-manifest-integrity-config"
 const useRemote = true
 
 // +kubebuilder:webhook:path=/validate-resource,mutating=false,failurePolicy=ignore,sideEffects=NoneOnDryRun,groups=*,resources=*,verbs=create;update,versions=*,name=k8smanifest.sigstore.dev,admissionReviewVersions={v1,v1beta1}

@@ -34,8 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-const defaultPodNamespace = "k8s-manifest-sigstore"
-const defaultIshieldConfigName = "integrity-shield-config"
 const remoteRequestHandlerURL = "https://integrity-shield-api.k8s-manifest-sigstore.svc:8123/api/request"
 
 func RequestHandlerController(remote bool, req admission.Request, paramObj *miprofile.ParameterObject) *ResultFromRequestHandler {
