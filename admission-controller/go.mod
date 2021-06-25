@@ -9,8 +9,8 @@ require (
 	github.com/onsi/gomega v1.13.0 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/sigstore/cosign v0.4.1-0.20210602105506-5cb21aa7fbf9 // indirect
+	github.com/sigstore/k8s-manifest-sigstore v0.0.0-20210624140046-8db49ca6f5c3
 	github.com/sirupsen/logrus v1.8.1
-	github.com/yuji-watanabe-jp/k8s-manifest-sigstore v0.0.0-20210617041144-9d27c6cc6d34
 	golang.org/x/tools v0.1.2 // indirect
 	k8s.io/api v0.21.1
 	k8s.io/apiextensions-apiserver v0.21.1 // indirect

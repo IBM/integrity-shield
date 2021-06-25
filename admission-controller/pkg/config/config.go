@@ -30,7 +30,7 @@ import (
 	"github.com/IBM/integrity-shield/admission-controller/pkg/apis/manifestintegrityprofile/v1alpha1"
 	miprofile "github.com/IBM/integrity-shield/admission-controller/pkg/apis/manifestintegrityprofile/v1alpha1"
 	mipclient "github.com/IBM/integrity-shield/admission-controller/pkg/client/manifestintegrityprofile/clientset/versioned/typed/manifestintegrityprofile/v1alpha1"
-	"github.com/yuji-watanabe-jp/k8s-manifest-sigstore/pkg/util/kubeutil"
+	"github.com/sigstore/k8s-manifest-sigstore/pkg/util/kubeutil"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

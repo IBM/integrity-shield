@@ -26,9 +26,9 @@ import (
 
 	miprofile "github.com/IBM/integrity-shield/admission-controller/pkg/apis/manifestintegrityprofile/v1alpha1"
 	k8smnfconfig "github.com/IBM/integrity-shield/admission-controller/pkg/config"
+	"github.com/sigstore/k8s-manifest-sigstore/pkg/k8smanifest"
+	"github.com/sigstore/k8s-manifest-sigstore/pkg/util/mapnode"
 	log "github.com/sirupsen/logrus"
-	"github.com/yuji-watanabe-jp/k8s-manifest-sigstore/pkg/k8smanifest"
-	"github.com/yuji-watanabe-jp/k8s-manifest-sigstore/pkg/util/mapnode"
 	v1 "k8s.io/api/admission/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"

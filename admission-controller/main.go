@@ -24,8 +24,8 @@ import (
 
 	"github.com/IBM/integrity-shield/admission-controller/pkg/config"
 	"github.com/IBM/integrity-shield/admission-controller/pkg/shield"
+	k8smnfutil "github.com/sigstore/k8s-manifest-sigstore/pkg/util"
 	log "github.com/sirupsen/logrus"
-	k8smnfutil "github.com/yuji-watanabe-jp/k8s-manifest-sigstore/pkg/util"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -120,56 +120,56 @@ func matchCheck(req admission.Request, match miprofile.MatchCondition) bool {
 		}
 	}
 	// check if matched kind/namespace
-	ns_matched := false
-	kind_matched := false
+	nsMatched := false
+	kindMatched := false
 	if len(match.Namespaces) == 0 {
-		ns_matched = true
+		nsMatched = true
 	} else {
 		// check if cluster scope
 		if req.Namespace == "" {
-			ns_matched = true
+			nsMatched = true
 		}
 		for _, ns := range match.Namespaces {
 			if k8smnfutil.MatchPattern(ns, req.Namespace) {
-				ns_matched = true
+				nsMatched = true
 			}
 		}
 	}
 	if len(match.Kinds) == 0 {
-		kind_matched = true
+		kindMatched = true
 	} else {
 		for _, ns := range match.Kinds {
 			if k8smnfutil.MatchPattern(ns, req.Kind.Kind) {
-				kind_matched = true
+				kindMatched = true
 			}
 		}
 	}
-	if ns_matched && kind_matched {
+	if nsMatched && kindMatched {
 		return true
 	}
 	return false
 }
 
 func getAccumulatedResult(results []shield.ResultFromRequestHandler) *AccumulatedResult {
-	deny_messages := []string{}
-	allow_messages := []string{}
+	denyMessages := []string{}
+	allowMessages := []string{}
 	accumulatedRes := &AccumulatedResult{}
 	for _, result := range results {
 		if !result.Allow {
 			accumulatedRes.Allow = false
 			accumulatedRes.Message = result.Message
-			deny_messages = append(deny_messages, result.Message)
+			denyMessages = append(denyMessages, result.Message)
 		} else {
-			allow_messages = append(allow_messages, result.Message)
+			allowMessages = append(allowMessages, result.Message)
 		}
 	}
-	if len(deny_messages) != 0 {
+	if len(denyMessages) != 0 {
 		accumulatedRes.Allow = false
-		accumulatedRes.Message = strings.Join(deny_messages, ";")
+		accumulatedRes.Message = strings.Join(denyMessages, ";")
 		return accumulatedRes
 	}
 	accumulatedRes.Allow = true
-	accumulatedRes.Message = strings.Join(allow_messages, ";")
+	accumulatedRes.Message = strings.Join(allowMessages, ";")
 	return accumulatedRes
 }
 

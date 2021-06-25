@@ -21,7 +21,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	k8smanifest "github.com/yuji-watanabe-jp/k8s-manifest-sigstore/pkg/k8smanifest"
+	k8smanifest "github.com/sigstore/k8s-manifest-sigstore/pkg/k8smanifest"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 

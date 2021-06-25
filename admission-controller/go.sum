@@ -1629,6 +1629,8 @@ github.com/sigstore/cosign v0.4.1-0.20210602105506-5cb21aa7fbf9 h1:R00GkqCZQY2kz
 github.com/sigstore/cosign v0.4.1-0.20210602105506-5cb21aa7fbf9/go.mod h1:sIOvPbA2HKUM2JEq6SgDldjIAidUyiKxMr9hqtnmuIs=
 github.com/sigstore/fulcio v0.0.0-20210405115948-e7630f533fca h1:CB8JH2VzlMHqgtMhCQpiMQ0zER0tYDeM6xbv++VHcjQ=
 github.com/sigstore/fulcio v0.0.0-20210405115948-e7630f533fca/go.mod h1:l16xJtuil/zC7RaacVfLf8EwmkFEMWI0hYxKkkahL2I=
+github.com/sigstore/k8s-manifest-sigstore v0.0.0-20210624140046-8db49ca6f5c3 h1:Cx5+vrgNExYkEdQCqOcv4Xsq3kDGRt7WKxT96GiKKq4=
+github.com/sigstore/k8s-manifest-sigstore v0.0.0-20210624140046-8db49ca6f5c3/go.mod h1:XKHMZ1jnm2cNNF3EWmNzyWS24+8yqcKjwSOJ03bUNaI=
 github.com/sigstore/rekor v0.1.1/go.mod h1:b+T8TvGKWgaFbtPRQgF/gXjbj/R9HdJ5lA93cnGT3Sc=
 github.com/sigstore/rekor v0.1.2-0.20210514231425-7e3d950f34c6/go.mod h1:3q5eM6+yOcyqJwhS1zxGneWYTX82QLp0wpbbVEtkPdo=
 github.com/sigstore/rekor v0.1.2-0.20210519014330-b5480728bde6 h1:i2JW972EVgp7QBy18MObuRsixWznaC1G+sett9t9Fks=
@@ -1833,8 +1835,6 @@ github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9de
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.3.5/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1Zlc8k=
-github.com/yuji-watanabe-jp/k8s-manifest-sigstore v0.0.0-20210617041144-9d27c6cc6d34 h1:zsBCE32H6Lsr4VSkExQnouirOf70dsyt6ONS/gdouEQ=
-github.com/yuji-watanabe-jp/k8s-manifest-sigstore v0.0.0-20210617041144-9d27c6cc6d34/go.mod h1:56xyzq5md0/AxS02f+Y8ri1xwxNDvTp2sY09I6FtUKo=
 github.com/yvasiyarov/go-metrics v0.0.0-20140926110328-57bccd1ccd43/go.mod h1:aX5oPXxHm3bOH+xeAttToC8pqch2ScQN/JoXYupl6xs=
 github.com/yvasiyarov/gorelic v0.0.0-20141212073537-a9bba5b9ab50/go.mod h1:NUSPSUX/bi6SeDMUh6brw0nXpxHnc96TguQh0+r/ssA=
 github.com/yvasiyarov/newrelic_platform_go v0.0.0-20140908184405-b21fdbd4370f/go.mod h1:GlGEuHIJweS1mbCqG+7vt2nvWLzLLnRHbXz5JKd/Qbg=
