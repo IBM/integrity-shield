@@ -37,7 +37,7 @@ type ManifestIntegrityProfileSpec struct {
 type MatchCondition struct {
 	Kinds              []string `json:"kinds,omitempty"`
 	Namespaces         []string `json:"namespaces,omitempty"`
-	ExcludedNamespaces []string `json:"excludednamespaces,omitempty"`
+	ExcludedNamespaces []string `json:"excludedNamespaces,omitempty"`
 }
 
 type ParameterObject struct {

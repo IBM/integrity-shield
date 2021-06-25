@@ -107,6 +107,7 @@ func (h *k8sManifestHandler) Handle(ctx context.Context, req admission.Request) 
 	// TODO: update status
 
 	// return admission response
+	log.Info("[DEBUG] process result: ", ar.Allow, ", ", ar.Message)
 	if ar.Allow {
 		return admission.Allowed(ar.Message)
 	} else {
@@ -154,12 +155,15 @@ func matchCheck(req admission.Request, match miprofile.MatchCondition) bool {
 
 func getAccumulatedResult(results []shield.ResultFromRequestHandler) *AccumulatedResult {
 	deny_messages := []string{}
+	allow_messages := []string{}
 	accumulatedRes := &AccumulatedResult{}
 	for _, result := range results {
 		if !result.Allow {
 			accumulatedRes.Allow = false
 			accumulatedRes.Message = result.Message
 			deny_messages = append(deny_messages, result.Message)
+		} else {
+			allow_messages = append(allow_messages, result.Message)
 		}
 	}
 	if len(deny_messages) != 0 {
@@ -168,6 +172,7 @@ func getAccumulatedResult(results []shield.ResultFromRequestHandler) *Accumulate
 		return accumulatedRes
 	}
 	accumulatedRes.Allow = true
+	accumulatedRes.Message = strings.Join(allow_messages, ";")
 	return accumulatedRes
 }
 

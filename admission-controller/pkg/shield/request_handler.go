@@ -56,25 +56,33 @@ func RequestHandlerController(remote bool, req admission.Request, paramObj *mipr
 		res, err := client.Post(remoteRequestHandlerURL, "application/json", bytes.NewBuffer([]byte(inputjson)))
 		if err != nil {
 			log.Error("Error reported from Remote RequestHandler", err.Error())
-			r.Message = err.Error()
-			return r
+			return &ResultFromRequestHandler{
+				Allow:   true,
+				Message: "error but allow for development",
+			}
 		}
 		if res.StatusCode != 200 {
 			log.Error("Error reported from Remote RequestHandler: statusCode is not 200")
-			r.Message = "Error reported from Remote RequestHandler"
-			return r
+			return &ResultFromRequestHandler{
+				Allow:   true,
+				Message: "error but allow for development",
+			}
 		}
 		body, err := ioutil.ReadAll(res.Body)
 		if err != nil {
 			log.Error("error: fail to read body: ", err)
-			r.Message = err.Error()
-			return r
+			return &ResultFromRequestHandler{
+				Allow:   true,
+				Message: "error but allow for development",
+			}
 		}
 		err = json.Unmarshal([]byte(string(body)), &r)
 		if err != nil {
 			log.Error("error: fail to Unmarshal: ", err)
-			r.Message = err.Error()
-			return r
+			return &ResultFromRequestHandler{
+				Allow:   true,
+				Message: "error but allow for development",
+			}
 		}
 		log.Info("[DEBUG] Response from remote request handler ", r)
 		return r

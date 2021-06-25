@@ -40,7 +40,6 @@ func GetParametersFromConstraint(constraint v1alpha1.ManifestIntegrityProfileSpe
 }
 
 func LoadConstraints() ([]v1alpha1.ManifestIntegrityProfileSpec, error) {
-	loadManifestIntegiryProfile()
 	manifestIntegrityProfileList, err := loadManifestIntegiryProfiles()
 	if err != nil {
 		return []v1alpha1.ManifestIntegrityProfileSpec{}, err
@@ -60,33 +59,12 @@ func loadConstraintsFromProfileList(miplist *v1alpha1.ManifestIntegrityProfileLi
 	return constraints
 }
 
-func loadManifestIntegiryProfile() (*v1alpha1.ManifestIntegrityProfile, error) {
-	// TODO: kubeconfig
-	config, err := kubeutil.GetKubeConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	clientset, err := mipclient.NewForConfig(config)
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-	mip, err := clientset.ManifestIntegrityProfiles().Get(context.Background(), "constraint-configmap", metav1.GetOptions{})
-	if err != nil {
-		log.Error("failed to get ManifestIntegrityProfiles:", err.Error())
-		return nil, err
-	}
-	return mip, nil
-}
-
 func loadManifestIntegiryProfiles() (*v1alpha1.ManifestIntegrityProfileList, error) {
 	// TODO: kubeconfig
 	config, err := kubeutil.GetKubeConfig()
 	if err != nil {
 		return nil, nil
 	}
-
 	clientset, err := mipclient.NewForConfig(config)
 	if err != nil {
 		log.Error(err)
