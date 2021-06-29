@@ -115,6 +115,13 @@ func RequestHandler(req admission.Request, paramObj *miprofile.ParameterObject) 
 
 	// load shield config
 	isconfig, err := loadShieldConfig()
+	if err != nil {
+		log.Errorf("failed to load shield config", err.Error())
+		return &ResultFromRequestHandler{
+			Allow:   true,
+			Message: "error but allow for development",
+		}
+	}
 	commonSkipUserMatched := false
 	skipObjectMatched := false
 	if isconfig != nil {
@@ -278,11 +285,11 @@ func loadShieldConfig() (*ShieldConfig, error) {
 		return nil, errors.New(fmt.Sprintf("`%s` is not found in configmap", configKeyInConfigMap))
 	}
 	var sc *ShieldConfig
-	err = json.Unmarshal([]byte(cfgBytes), &sc)
-	if err != nil {
-		return sc, errors.Wrap(err, fmt.Sprintf("failed to unmarshal config.yaml into %T", sc))
-	}
-	// log.Info("[DEBUG] ShieldConfig: ", sc)
+	_ = json.Unmarshal([]byte(cfgBytes), &sc)
+	// if err != nil {
+	// 	return sc, errors.Wrap(err, fmt.Sprintf("failed to unmarshal config.yaml into %T", sc))
+	// }
+	log.Info("[DEBUG] ShieldConfig: ", sc)
 	return sc, nil
 }
 
