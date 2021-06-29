@@ -10,6 +10,7 @@ TMP_CERT_CONFIG_PATH ?= /tmp/api-crt.conf
 
 build:
 	@echo building binary
+	go mod tidy
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -ldflags="-s -w" -a -o build/_bin/ishield-api ./
 	@echo building image
 	docker build -t $(NAME):$(VERSION) .

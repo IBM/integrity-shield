@@ -24,7 +24,7 @@ import (
 	"net/http"
 	"path"
 
-	"github.com/IBM/integrity-shield/admission-controller/pkg/config"
+	miprofile "github.com/IBM/integrity-shield/admission-controller/pkg/apis/manifestintegrityprofile/v1alpha1"
 	"github.com/IBM/integrity-shield/admission-controller/pkg/shield"
 	log "github.com/sirupsen/logrus"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -69,7 +69,7 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 	body := bufbody.Bytes()
 	var inputMap map[string]interface{}
 	var request *admission.Request
-	var parameters *config.ParameterObject
+	var parameters *miprofile.ParameterObject
 	err := json.Unmarshal(body, &inputMap)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("unmarshaling input data as map[string]interface{}: %v", err), http.StatusInternalServerError)
@@ -104,6 +104,7 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("failed to convert `parameters` in input object into %T", parameters), http.StatusInternalServerError)
 		return
 	}
+	fmt.Println("parameters:", parameters)
 	result := shield.RequestHandler(*request, parameters)
 
 	resp, err := json.Marshal(result)

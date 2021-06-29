@@ -26,15 +26,23 @@ import (
 
 	miprofile "github.com/IBM/integrity-shield/admission-controller/pkg/apis/manifestintegrityprofile/v1alpha1"
 	k8smnfconfig "github.com/IBM/integrity-shield/admission-controller/pkg/config"
+	"github.com/pkg/errors"
 	"github.com/sigstore/k8s-manifest-sigstore/pkg/k8smanifest"
+	k8ssigutil "github.com/sigstore/k8s-manifest-sigstore/pkg/util"
+	"github.com/sigstore/k8s-manifest-sigstore/pkg/util/kubeutil"
 	"github.com/sigstore/k8s-manifest-sigstore/pkg/util/mapnode"
 	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/admission/v1"
+	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 const remoteRequestHandlerURL = "https://integrity-shield-api.k8s-manifest-sigstore.svc:8123/api/request"
+const configKeyInConfigMap = "config.json"
+const defaultPodNamespace = "k8s-manifest-sigstore"
+const ishieldConfigMapName = "k8s-manifest-integrity-config"
 
 func RequestHandlerController(remote bool, req admission.Request, paramObj *miprofile.ParameterObject) *ResultFromRequestHandler {
 	r := &ResultFromRequestHandler{}
@@ -105,8 +113,16 @@ func RequestHandler(req admission.Request, paramObj *miprofile.ParameterObject) 
 		}
 	}
 
-	// TODO: load shield config
-	_ = loadShieldConfig()
+	// load shield config
+	isconfig, err := loadShieldConfig()
+	commonSkipUserMatched := false
+	skipObjectMatched := false
+	if isconfig != nil {
+		//filter by user listed in common profile
+		commonSkipUserMatched = isconfig.CommonProfile.SkipUsers.Match(resource, req.AdmissionRequest.UserInfo.Username)
+		// ignore object
+		skipObjectMatched = isconfig.CommonProfile.SkipObjects.Match(resource)
+	}
 
 	// TODO: Proccess with parameter
 	//filter by user
@@ -116,14 +132,17 @@ func RequestHandler(req admission.Request, paramObj *miprofile.ParameterObject) 
 	inScopeObjMatched := paramObj.InScopeObjects.Match(resource)
 
 	//operation check
-	isUpdateRequest := isUpdateRequest(req.AdmissionRequest.Operation)
+	updateRequestMatched := isUpdateRequest(req.AdmissionRequest.Operation)
 
 	allow := true
 	message := ""
-	if skipUserMatched {
+	if skipUserMatched || commonSkipUserMatched {
 		allow = true
 		message = "ignore user config matched"
 	} else if !inScopeObjMatched {
+		allow = true
+		message = "this resource is not in scope of verification"
+	} else if skipObjectMatched {
 		allow = true
 		message = "this resource is not in scope of verification"
 	} else {
@@ -134,9 +153,11 @@ func RequestHandler(req admission.Request, paramObj *miprofile.ParameterObject) 
 		if paramObj.KeySecertName != "" {
 			keyPath, _ = k8smnfconfig.LoadKeySecret(paramObj.KeySecertNamespace, paramObj.KeySecertName)
 		}
-		vo := &(paramObj.VerifyOption)
+		vo := setVerifyOption(&paramObj.VerifyOption, isconfig)
+		//vo := &(paramObj.VerifyOption)
 		// call VerifyResource with resource, verifyOption, keypath, imageRef
 		result, err := k8smanifest.VerifyResource(resource, imageRef, keyPath, vo)
+		log.Info("[DEBUG] result from VerifyResource: ", result)
 		if err != nil {
 			log.Errorf("failed to check a requested resource; %s", err.Error())
 			return &ResultFromRequestHandler{
@@ -158,10 +179,12 @@ func RequestHandler(req admission.Request, paramObj *miprofile.ParameterObject) 
 					message = fmt.Sprintf("signer config not matched, this is signed by %s", result.Signer)
 				}
 			}
-			if isUpdateRequest {
+			if updateRequestMatched && !result.Verified && result.Diff != nil && result.Diff.Size() > 0 {
 				// TODO: mutation check for update request
-				isMutated := checkIgnoreFields(result.Diff, paramObj.IgnoreFields)
-				if !isMutated {
+				// mutation check..?
+				isIgnoredByParam := checkIgnoreFields(resource, result.Diff, paramObj.IgnoreFields)
+				isIgnoredByCommonProfile := checkIgnoreFields(resource, result.Diff, isconfig.CommonProfile.IgnoreFields)
+				if isIgnoredByParam || isIgnoredByCommonProfile {
 					allow = true
 					message = "no mutation found"
 				}
@@ -188,20 +211,79 @@ type ResultFromRequestHandler struct {
 	Message string
 }
 
-type IshieldConfig struct {
-	IshieldConfig string
+type CommonProfile struct {
+	SkipObjects  k8smanifest.ObjectReferenceList    `json:"skipObjects,omitempty"`
+	SkipUsers    miprofile.ObjectUserBindingList    `json:"skipUsers,omitempty"`
+	IgnoreFields k8smanifest.ObjectFieldBindingList `json:"ignoreFields,omitempty"`
 }
 
-func loadShieldConfig() IshieldConfig {
-	return IshieldConfig{}
+type ShieldConfig struct {
+	// Log        *LoggingScopeConfig `json:"log,omitempty"`
+	// SideEffect *SideEffectConfig   `json:"sideEffect,omitempty"`
+	CommonProfile CommonProfile `json:"commonProfile,omitempty"`
 }
 
 func isUpdateRequest(operation v1.Operation) bool {
 	return (operation == v1.Update)
 }
 
-func checkIgnoreFields(diff *mapnode.DiffResult, ignoreFields k8smanifest.ObjectFieldBindingList) bool {
-	return true
+func checkIgnoreFields(resource unstructured.Unstructured, diff *mapnode.DiffResult, ignoreFields k8smanifest.ObjectFieldBindingList) bool {
+	objectMatched, fields := ignoreFields.Match(resource)
+	if objectMatched {
+		for _, d := range diff.Items {
+			var filtered bool
+			for _, field := range fields {
+				matched := k8ssigutil.MatchPattern(field, d.Key)
+				if matched {
+					filtered = true
+				}
+			}
+			if !filtered {
+				return false
+			}
+		}
+		return true
+	} else {
+		return false
+	}
+}
+
+func setVerifyOption(vo *k8smanifest.VerifyOption, isconfig *ShieldConfig) *k8smanifest.VerifyOption {
+	if isconfig == nil {
+		return vo
+	}
+	fields := k8smanifest.ObjectFieldBindingList{}
+	fields = append(fields, vo.IgnoreFields...)
+	fields = append(fields, isconfig.CommonProfile.IgnoreFields...)
+	vo.IgnoreFields = fields
+	log.Info("[DEBUG] setVerifyOption: ", vo)
+	return vo
+}
+
+func loadShieldConfig() (*ShieldConfig, error) {
+	log.Info("[DEBUG] loadShieldConfig: ", defaultPodNamespace, ", ", ishieldConfigMapName)
+	obj, err := kubeutil.GetResource("v1", "ConfigMap", defaultPodNamespace, ishieldConfigMapName)
+	if err != nil {
+		if k8serrors.IsNotFound(err) {
+			log.Info("[DEBUG] loadShieldConfig NotFound")
+			return nil, nil
+		}
+		return nil, errors.Wrap(err, fmt.Sprintf("failed to get a configmap `%s` in `%s` namespace", ishieldConfigMapName, defaultPodNamespace))
+	}
+	objBytes, _ := json.Marshal(obj.Object)
+	var cm corev1.ConfigMap
+	_ = json.Unmarshal(objBytes, &cm)
+	cfgBytes, found := cm.Data[configKeyInConfigMap]
+	if !found {
+		return nil, errors.New(fmt.Sprintf("`%s` is not found in configmap", configKeyInConfigMap))
+	}
+	var sc *ShieldConfig
+	err = json.Unmarshal([]byte(cfgBytes), &sc)
+	if err != nil {
+		return sc, errors.Wrap(err, fmt.Sprintf("failed to unmarshal config.yaml into %T", sc))
+	}
+	// log.Info("[DEBUG] ShieldConfig: ", sc)
+	return sc, nil
 }
 
 type RemoteRequestHandlerInputMap struct {

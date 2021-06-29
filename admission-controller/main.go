@@ -20,6 +20,7 @@ import (
 	"context"
 	"flag"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/IBM/integrity-shield/admission-controller/pkg/config"
@@ -47,7 +48,6 @@ var (
 )
 
 const tlsDir = `/run/secrets/tls`
-const useRemote = true
 
 // +kubebuilder:webhook:path=/validate-resource,mutating=false,failurePolicy=ignore,sideEffects=NoneOnDryRun,groups=*,resources=*,verbs=create;update,versions=*,name=k8smanifest.sigstore.dev,admissionReviewVersions={v1,v1beta1}
 
@@ -90,6 +90,7 @@ func (h *k8sManifestHandler) Handle(ctx context.Context, req admission.Request) 
 		paramObj := config.GetParametersFromConstraint(constraint)
 
 		// call request handler & receive result from request handler (allow, message)
+		useRemote, _ := strconv.ParseBool(os.Getenv("USE_REMOTE_HANDLER"))
 		r := shield.RequestHandlerController(useRemote, req, paramObj)
 		// r := shield.RequestHandler(req, paramObj)
 
@@ -156,7 +157,6 @@ func getAccumulatedResult(results []shield.ResultFromRequestHandler) *Accumulate
 	accumulatedRes := &AccumulatedResult{}
 	for _, result := range results {
 		if !result.Allow {
-			accumulatedRes.Allow = false
 			accumulatedRes.Message = result.Message
 			denyMessages = append(denyMessages, result.Message)
 		} else {

@@ -27,7 +27,6 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/IBM/integrity-shield/admission-controller/pkg/apis/manifestintegrityprofile/v1alpha1"
 	miprofile "github.com/IBM/integrity-shield/admission-controller/pkg/apis/manifestintegrityprofile/v1alpha1"
 	mipclient "github.com/IBM/integrity-shield/admission-controller/pkg/client/manifestintegrityprofile/clientset/versioned/typed/manifestintegrityprofile/v1alpha1"
 	"github.com/sigstore/k8s-manifest-sigstore/pkg/util/kubeutil"
@@ -35,31 +34,31 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func GetParametersFromConstraint(constraint v1alpha1.ManifestIntegrityProfileSpec) *miprofile.ParameterObject {
+func GetParametersFromConstraint(constraint miprofile.ManifestIntegrityProfileSpec) *miprofile.ParameterObject {
 	return &constraint.Parameters
 }
 
-func LoadConstraints() ([]v1alpha1.ManifestIntegrityProfileSpec, error) {
+func LoadConstraints() ([]miprofile.ManifestIntegrityProfileSpec, error) {
 	manifestIntegrityProfileList, err := loadManifestIntegiryProfiles()
 	if err != nil {
-		return []v1alpha1.ManifestIntegrityProfileSpec{}, err
+		return []miprofile.ManifestIntegrityProfileSpec{}, err
 	}
 	if manifestIntegrityProfileList == nil {
-		return []v1alpha1.ManifestIntegrityProfileSpec{}, nil
+		return []miprofile.ManifestIntegrityProfileSpec{}, nil
 	}
 	constraints := loadConstraintsFromProfileList(manifestIntegrityProfileList)
 	return constraints, nil
 }
 
-func loadConstraintsFromProfileList(miplist *v1alpha1.ManifestIntegrityProfileList) []v1alpha1.ManifestIntegrityProfileSpec {
-	var constraints []v1alpha1.ManifestIntegrityProfileSpec
+func loadConstraintsFromProfileList(miplist *miprofile.ManifestIntegrityProfileList) []miprofile.ManifestIntegrityProfileSpec {
+	var constraints []miprofile.ManifestIntegrityProfileSpec
 	for _, mip := range miplist.Items {
 		constraints = append(constraints, mip.Spec)
 	}
 	return constraints
 }
 
-func loadManifestIntegiryProfiles() (*v1alpha1.ManifestIntegrityProfileList, error) {
+func loadManifestIntegiryProfiles() (*miprofile.ManifestIntegrityProfileList, error) {
 	// TODO: kubeconfig
 	config, err := kubeutil.GetKubeConfig()
 	if err != nil {
