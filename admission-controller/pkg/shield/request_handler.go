@@ -28,7 +28,6 @@ import (
 	k8smnfconfig "github.com/IBM/integrity-shield/admission-controller/pkg/config"
 	"github.com/pkg/errors"
 	"github.com/sigstore/k8s-manifest-sigstore/pkg/k8smanifest"
-	k8ssigutil "github.com/sigstore/k8s-manifest-sigstore/pkg/util"
 	"github.com/sigstore/k8s-manifest-sigstore/pkg/util/kubeutil"
 	"github.com/sigstore/k8s-manifest-sigstore/pkg/util/mapnode"
 	log "github.com/sirupsen/logrus"
@@ -131,15 +130,32 @@ func RequestHandler(req admission.Request, paramObj *miprofile.ParameterObject) 
 		skipObjectMatched = isconfig.CommonProfile.SkipObjects.Match(resource)
 	}
 
-	// TODO: Proccess with parameter
+	// Proccess with parameter
 	//filter by user
 	skipUserMatched := paramObj.SkipUsers.Match(resource, req.AdmissionRequest.UserInfo.Username)
 
 	//check scope
 	inScopeObjMatched := paramObj.InScopeObjects.Match(resource)
 
-	//operation check
-	updateRequestMatched := isUpdateRequest(req.AdmissionRequest.Operation)
+	// mutation check
+	if isUpdateRequest(req.AdmissionRequest.Operation) {
+		ignoreFields := getMatchedIgnoreFields(paramObj.IgnoreFields, isconfig.CommonProfile.IgnoreFields, resource)
+		mutated, err := mutationCheck(req.AdmissionRequest.OldObject.Raw, req.AdmissionRequest.Object.Raw, ignoreFields)
+		if err != nil {
+			log.Errorf("failed to check mutation", err.Error())
+			return &ResultFromRequestHandler{
+				Allow:   true,
+				Message: "error but allow for development",
+			}
+		}
+		if !mutated {
+			log.Info("[DEBUG] Mutation check: no mutation found")
+			return &ResultFromRequestHandler{
+				Allow:   true,
+				Message: "no mutation found",
+			}
+		}
+	}
 
 	allow := true
 	message := ""
@@ -186,16 +202,6 @@ func RequestHandler(req admission.Request, paramObj *miprofile.ParameterObject) 
 					message = fmt.Sprintf("signer config not matched, this is signed by %s", result.Signer)
 				}
 			}
-			if updateRequestMatched && !result.Verified && result.Diff != nil && result.Diff.Size() > 0 {
-				// TODO: mutation check for update request
-				// mutation check..?
-				isIgnoredByParam := checkIgnoreFields(resource, result.Diff, paramObj.IgnoreFields)
-				isIgnoredByCommonProfile := checkIgnoreFields(resource, result.Diff, isconfig.CommonProfile.IgnoreFields)
-				if isIgnoredByParam || isIgnoredByCommonProfile {
-					allow = true
-					message = "no mutation found"
-				}
-			}
 		} else {
 			allow = true
 			message = "not protected"
@@ -234,25 +240,58 @@ func isUpdateRequest(operation v1.Operation) bool {
 	return (operation == v1.Update)
 }
 
-func checkIgnoreFields(resource unstructured.Unstructured, diff *mapnode.DiffResult, ignoreFields k8smanifest.ObjectFieldBindingList) bool {
-	objectMatched, fields := ignoreFields.Match(resource)
-	if objectMatched {
-		for _, d := range diff.Items {
-			var filtered bool
-			for _, field := range fields {
-				matched := k8ssigutil.MatchPattern(field, d.Key)
-				if matched {
-					filtered = true
-				}
-			}
-			if !filtered {
-				return false
-			}
-		}
-		return true
-	} else {
-		return false
+func getMatchedIgnoreFields(pi, ci k8smanifest.ObjectFieldBindingList, resource unstructured.Unstructured) []string {
+	var allIgnoreFields []string
+	_, fields := pi.Match(resource)
+	_, commonfields := ci.Match(resource)
+	allIgnoreFields = append(allIgnoreFields, fields...)
+	allIgnoreFields = append(allIgnoreFields, commonfields...)
+	return allIgnoreFields
+}
+
+func mutationCheck(rawOldObject, rawObject []byte, IgnoreFields []string) (bool, error) {
+	var oldObject *mapnode.Node
+	var newObject *mapnode.Node
+	mask := []string{
+		"metadata.annotations.namespace",
+		"metadata.annotations.kubectl.\"kubernetes.io/last-applied-configuration\"",
+		"metadata.annotations.deprecated.daemonset.template.generation",
+		"metadata.creationTimestamp",
+		"metadata.uid",
+		"metadata.generation",
+		"metadata.managedFields",
+		"metadata.selfLink",
+		"metadata.resourceVersion",
+		"status",
 	}
+	if v, err := mapnode.NewFromBytes(rawObject); err != nil || v == nil {
+		return false, err
+	} else {
+		v = v.Mask(mask)
+		obj := v.ToMap()
+		newObject, _ = mapnode.NewFromMap(obj)
+	}
+	if v, err := mapnode.NewFromBytes(rawOldObject); err != nil || v == nil {
+		return false, err
+	} else {
+		v = v.Mask(mask)
+		oldObj := v.ToMap()
+		oldObject, _ = mapnode.NewFromMap(oldObj)
+	}
+	// diff
+	dr := oldObject.Diff(newObject)
+	if dr.Size() == 0 {
+		return false, nil
+	}
+	// ignoreField check
+	unfiltered := &mapnode.DiffResult{}
+	if dr != nil && dr.Size() > 0 {
+		_, unfiltered, _ = dr.Filter(IgnoreFields)
+	}
+	if unfiltered.Size() == 0 {
+		return false, nil
+	}
+	return true, nil
 }
 
 func setVerifyOption(vo *k8smanifest.VerifyOption, isconfig *ShieldConfig) *k8smanifest.VerifyOption {
