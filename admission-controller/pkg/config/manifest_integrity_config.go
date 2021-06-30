@@ -30,7 +30,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-type HandlerConfig struct {
+type ManifestIntegrityConfig struct {
 	ImageVerificationConfig ImageVerificationConfig `json:"imageVerificationConfig,omitempty"`
 	KeyPathList             []string                `json:"keyPathList,omitempty"`
 	SigStoreConfig          SigStoreConfig          `json:"sigStoreConfig,omitempty"`

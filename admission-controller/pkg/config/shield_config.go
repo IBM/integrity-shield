@@ -32,7 +32,8 @@ type ShieldConfig struct {
 }
 
 type NamespaceSelector struct {
-	Include []string `json:"include,omitempty"`
+	// TODO: check how include works, match in constraint
+	// Include []string `json:"include,omitempty"`
 	Exclude []string `json:"exclude,omitempty"`
 }
 
@@ -57,20 +58,13 @@ type PatchConfig struct {
 
 func (ns NamespaceSelector) Match(rns string) bool {
 	excluded := false
-	included := true
 	if len(ns.Exclude) != 0 {
 		excluded = k8smnfutil.MatchWithPatternArray(rns, ns.Exclude)
-	}
-	if len(ns.Include) != 0 {
-		included = k8smnfutil.MatchWithPatternArray(rns, ns.Include)
 	}
 	if excluded {
 		return false
 	}
-	if included {
-		return true
-	}
-	return false
+	return true
 }
 
 func (allow Allow) Match(kind metav1.GroupVersionKind) bool {

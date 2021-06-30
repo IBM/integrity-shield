@@ -23,12 +23,20 @@ spec:
         imagePullPolicy: Always
         name: manager
         env:
-        # - name: POD_NAMESPACE
-        #   valueFrom:
-        #     fieldRef:
-        #       fieldPath: metadata.namespace
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         - name: USE_REMOTE_HANDLER
           value: "true"
+        - name: SHIELD_CONFIG_KEY
+          value: "config.yaml"
+        - name: SHIELD_CONFIG_NAME
+          value: "shield-config"
+        - name: MANIFEST_INTEGRITY_CONFIG_KEY
+          value: "config.yaml"
+        - name: MANIFEST_INTEGRITY_CONFIG_NAME
+          value: "k8s-manifest-integrity-config"
         ports:
         - containerPort: 9443
           name: validator-port

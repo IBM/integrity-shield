@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 
 	k8smnfconfig "github.com/IBM/integrity-shield/admission-controller/pkg/config"
 	"github.com/ghodss/yaml"
@@ -282,7 +283,7 @@ func mutationCheck(rawOldObject, rawObject []byte, IgnoreFields []string) (bool,
 	return true, nil
 }
 
-func setVerifyOption(vo *k8smanifest.VerifyOption, config *k8smnfconfig.HandlerConfig) *k8smanifest.VerifyOption {
+func setVerifyOption(vo *k8smanifest.VerifyOption, config *k8smnfconfig.ManifestIntegrityConfig) *k8smanifest.VerifyOption {
 	if config == nil {
 		return vo
 	}
@@ -294,12 +295,26 @@ func setVerifyOption(vo *k8smanifest.VerifyOption, config *k8smnfconfig.HandlerC
 	return vo
 }
 
-func loadRequestHandlerConfig() (*k8smnfconfig.HandlerConfig, error) {
-	log.Info("[DEBUG] loadHandlerConfig: ", defaultPodNamespace, ", ", handlerConfigMapName)
+func loadRequestHandlerConfig() (*k8smnfconfig.ManifestIntegrityConfig, error) {
+	namespace := os.Getenv("POD_NAMESPACE")
+	if namespace == "" {
+		namespace = defaultPodNamespace
+	}
+	configName := os.Getenv("MANIFEST_INTEGRITY_CONFIG_NAME")
+	if configName == "" {
+		configName = handlerConfigMapName
+	}
+	configKey := os.Getenv("MANIFEST_INTEGRITY_CONFIG_KEY")
+	if configKey == "" {
+		configKey = configKeyInConfigMap
+	}
+
+	// load
+	log.Info("[DEBUG] loadManifestIntegrityConfig: ", defaultPodNamespace, ", ", handlerConfigMapName)
 	obj, err := kubeutil.GetResource("v1", "ConfigMap", defaultPodNamespace, handlerConfigMapName)
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
-			log.Info("[DEBUG] HandlerConfig NotFound")
+			log.Info("[DEBUG] ManifestIntegrityConfig NotFound")
 			return nil, nil
 		}
 		return nil, errors.Wrap(err, fmt.Sprintf("failed to get a configmap `%s` in `%s` namespace", handlerConfigMapName, defaultPodNamespace))
@@ -311,7 +326,7 @@ func loadRequestHandlerConfig() (*k8smnfconfig.HandlerConfig, error) {
 	if !found {
 		return nil, errors.New(fmt.Sprintf("`%s` is not found in configmap", configKeyInConfigMap))
 	}
-	var sc *k8smnfconfig.HandlerConfig
+	var sc *k8smnfconfig.ManifestIntegrityConfig
 	err = yaml.Unmarshal([]byte(cfgBytes), &sc)
 	if err != nil {
 		return sc, errors.Wrap(err, fmt.Sprintf("failed to unmarshal config.yaml into %T", sc))

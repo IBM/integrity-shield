@@ -120,14 +120,27 @@ func GetParametersFromConstraint(constraint miprofile.ManifestIntegrityProfileSp
 }
 
 func loadShieldConfig() (*k8smnfconfig.ShieldConfig, error) {
-	log.Info("[DEBUG] loadShieldConfig: ", defaultPodNamespace, ", ", shieldConfigMapName)
-	obj, err := kubeutil.GetResource("v1", "ConfigMap", defaultPodNamespace, shieldConfigMapName)
+	namespace := os.Getenv("POD_NAMESPACE")
+	if namespace == "" {
+		namespace = defaultPodNamespace
+	}
+	configName := os.Getenv("SHIELD_CONFIG_NAME")
+	if configName == "" {
+		configName = shieldConfigMapName
+	}
+	configKey := os.Getenv("SHIELD_CONFIG_KEY")
+	if configKey == "" {
+		configKey = configKeyInConfigMap
+	}
+	// load
+	log.Info("[DEBUG] loadShieldConfig: ", namespace, ", ", configName)
+	obj, err := kubeutil.GetResource("v1", "ConfigMap", namespace, configName)
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
 			log.Info("[DEBUG] ShieldConfig NotFound")
 			return nil, nil
 		}
-		return nil, errors.Wrap(err, fmt.Sprintf("failed to get a configmap `%s` in `%s` namespace", shieldConfigMapName, defaultPodNamespace))
+		return nil, errors.Wrap(err, fmt.Sprintf("failed to get a configmap `%s` in `%s` namespace", configName, namespace))
 	}
 	objBytes, _ := json.Marshal(obj.Object)
 	var cm corev1.ConfigMap
