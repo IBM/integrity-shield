@@ -16,17 +16,31 @@
 
 package config
 
+import (
+	k8smnfutil "github.com/sigstore/k8s-manifest-sigstore/pkg/util"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
 type ShieldConfig struct {
-	InScopeNamespaceSelector []string         `json:"inScopeNamespaceSelector,omitempty"`
-	Allow                    []string         `json:"allow,omitempty"`
-	Log                      LogConfig        `json:"log,omitempty"`
-	SideEffect               SideEffectConfig `json:"sideEffect,omitempty"`
-	Patch                    PatchConfig      `json:"skipObjects,omitempty"`
-	Mode                     string           `json:"mode,omitempty"`
-	Options                  []string
+	InScopeNamespaceSelector NamespaceSelector `json:"inScopeNamespaceSelector,omitempty"`
+	Allow                    Allow             `json:"allow,omitempty"`
+	Log                      LogConfig         `json:"log,omitempty"`
+	SideEffect               SideEffectConfig  `json:"sideEffect,omitempty"`
+	Patch                    PatchConfig       `json:"skipObjects,omitempty"`
+	Mode                     string            `json:"mode,omitempty"`
+	Options                  []string          `json:"option,omitempty"`
+}
+
+type NamespaceSelector struct {
+	Include []string `json:"include,omitempty"`
+	Exclude []string `json:"exclude,omitempty"`
 }
 
 type LogConfig struct {
+}
+
+type Allow struct {
+	Kinds []metav1.GroupVersionKind `json:"kinds,omitempty"`
 }
 
 type SideEffectConfig struct {
@@ -34,9 +48,54 @@ type SideEffectConfig struct {
 	CreateDenyEvent            bool `json:"createDenyEvent"`
 	CreateIShieldResourceEvent bool `json:"createIShieldResourceEvent"`
 	// MIP
-	UpdateMIPStatusForDeniedRequest bool `json:"updateRSPStatusForDeniedRequest"`
+	UpdateMIPStatusForDeniedRequest bool `json:"updateMIPStatusForDeniedRequest"`
 }
 
 type PatchConfig struct {
 	Enabled bool `json:"enabled,omitempty"`
+}
+
+func (ns NamespaceSelector) Match(rns string) bool {
+	excluded := false
+	included := true
+	if len(ns.Exclude) != 0 {
+		excluded = k8smnfutil.MatchWithPatternArray(rns, ns.Exclude)
+	}
+	if len(ns.Include) != 0 {
+		included = k8smnfutil.MatchWithPatternArray(rns, ns.Include)
+	}
+	if excluded {
+		return false
+	}
+	if included {
+		return true
+	}
+	return false
+}
+
+func (allow Allow) Match(kind metav1.GroupVersionKind) bool {
+	for _, k := range allow.Kinds {
+		var groupMatch bool
+		var kindMatch bool
+		var versionMatch bool
+		if k.Group == "" {
+			groupMatch = true
+		} else if k8smnfutil.MatchSinglePattern(k.Group, kind.Group) {
+			groupMatch = true
+		}
+		if k.Kind == "" {
+			kindMatch = true
+		} else if k8smnfutil.MatchSinglePattern(k.Kind, kind.Kind) {
+			kindMatch = true
+		}
+		if k.Version == "" {
+			versionMatch = true
+		} else if k8smnfutil.MatchSinglePattern(k.Version, kind.Version) {
+			versionMatch = true
+		}
+		if groupMatch && kindMatch && versionMatch {
+			return true
+		}
+	}
+	return false
 }

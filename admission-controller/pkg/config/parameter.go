@@ -30,6 +30,8 @@ type ParameterObject struct {
 	KeySecertName            string                          `json:"keySecretName,omitempty"`
 	KeySecertNamespace       string                          `json:"keySecretNamespace,omitempty"`
 	ImageRef                 string                          `json:"imageRef,omitempty"`
+	TargetServiceAccount     []string                        `json:"targetServiceAccount,omitempty"`
+	ImageProfile             ImageProfile                    `json:"imageProfile,omitempty"`
 }
 
 type ObjectUserBindingList []ObjectUserBinding
@@ -37,6 +39,9 @@ type ObjectUserBindingList []ObjectUserBinding
 type ObjectUserBinding struct {
 	Objects k8smanifest.ObjectReferenceList `json:"objects,omitempty"`
 	Users   []string                        `json:"users,omitempty"`
+}
+
+type ImageProfile struct {
 }
 
 func (p *ParameterObject) DeepCopyInto(p2 *ParameterObject) {

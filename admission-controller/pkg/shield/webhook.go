@@ -18,6 +18,8 @@ package shield
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -26,12 +28,20 @@ import (
 	mipclient "github.com/IBM/integrity-shield/admission-controller/pkg/client/manifestintegrityprofile/clientset/versioned/typed/manifestintegrityprofile/v1alpha1"
 	k8smnfconfig "github.com/IBM/integrity-shield/admission-controller/pkg/config"
 	"github.com/IBM/integrity-shield/admission-controller/pkg/handler"
+	"github.com/ghodss/yaml"
+	"github.com/pkg/errors"
 	k8smnfutil "github.com/sigstore/k8s-manifest-sigstore/pkg/util"
 	"github.com/sigstore/k8s-manifest-sigstore/pkg/util/kubeutil"
 	log "github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
+
+const configKeyInConfigMap = "config.yaml"
+const defaultPodNamespace = "k8s-manifest-sigstore"
+const shieldConfigMapName = "shield-config"
 
 type AccumulatedResult struct {
 	Allow   bool
@@ -39,10 +49,27 @@ type AccumulatedResult struct {
 }
 
 func ProcessRequest(req admission.Request) admission.Response {
+	// load ac2 config
+	config, err := loadShieldConfig()
+	if err != nil {
+		log.Errorf("failed to load shield config; %s", err.Error())
+		return admission.Allowed("error but allow for development")
+	}
+	// isScope check
+	inScopeNamespace := config.InScopeNamespaceSelector.Match(req.Namespace)
+	if !inScopeNamespace {
+		return admission.Allowed("this namespace is out of scope")
+	}
+	// allow check
+	allowedRequest := config.Allow.Match(req.Kind)
+	if allowedRequest {
+		return admission.Allowed("this kind is out of scope")
+	}
+
 	// load constraints
 	constraints, err := LoadConstraints()
 	if err != nil {
-		log.Errorf("failed to load manifest integrity config; %s", err.Error())
+		log.Errorf("failed to load constratints; %s", err.Error())
 		return admission.Allowed("error but allow for development")
 	}
 
@@ -92,18 +119,33 @@ func GetParametersFromConstraint(constraint miprofile.ManifestIntegrityProfileSp
 	return &constraint.Parameters
 }
 
-func LoadConstraints() ([]miprofile.ManifestIntegrityProfileSpec, error) {
-	constraints, err := loadManifestIntegiryProfiles()
+func loadShieldConfig() (*k8smnfconfig.ShieldConfig, error) {
+	log.Info("[DEBUG] loadShieldConfig: ", defaultPodNamespace, ", ", shieldConfigMapName)
+	obj, err := kubeutil.GetResource("v1", "ConfigMap", defaultPodNamespace, shieldConfigMapName)
 	if err != nil {
-		return []miprofile.ManifestIntegrityProfileSpec{}, err
+		if k8serrors.IsNotFound(err) {
+			log.Info("[DEBUG] ShieldConfig NotFound")
+			return nil, nil
+		}
+		return nil, errors.Wrap(err, fmt.Sprintf("failed to get a configmap `%s` in `%s` namespace", shieldConfigMapName, defaultPodNamespace))
 	}
-	if constraints == nil {
-		return []miprofile.ManifestIntegrityProfileSpec{}, nil
+	objBytes, _ := json.Marshal(obj.Object)
+	var cm corev1.ConfigMap
+	_ = json.Unmarshal(objBytes, &cm)
+	cfgBytes, found := cm.Data[configKeyInConfigMap]
+	if !found {
+		return nil, errors.New(fmt.Sprintf("`%s` is not found in configmap", configKeyInConfigMap))
 	}
-	return constraints, nil
+	var sc *k8smnfconfig.ShieldConfig
+	err = yaml.Unmarshal([]byte(cfgBytes), &sc)
+	if err != nil {
+		return sc, errors.Wrap(err, fmt.Sprintf("failed to unmarshal config.yaml into %T", sc))
+	}
+	log.Info("[DEBUG] ShieldConfig: ", sc)
+	return sc, nil
 }
 
-func loadManifestIntegiryProfiles() ([]miprofile.ManifestIntegrityProfileSpec, error) {
+func LoadConstraints() ([]miprofile.ManifestIntegrityProfileSpec, error) {
 	config, err := kubeutil.GetKubeConfig()
 	if err != nil {
 		return nil, nil

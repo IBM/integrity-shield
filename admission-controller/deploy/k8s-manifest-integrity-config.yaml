@@ -9,12 +9,6 @@ data:
       skipObjects:
       - kind: ConfigMap
         name: kube-root-ca.crt
-      - kind: Event
-      - kind: Lease
-      - kind: Endpoints
-      - kind: TokenReview
-      - kind: SubjectAccessReview
-      - kind: SelfSubjectAccessReview   
       ignoreFields:
       - objects:
         - kind: ClusterServiceVersion
