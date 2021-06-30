@@ -20,19 +20,14 @@ import (
 	"context"
 	"flag"
 	"os"
-	"strconv"
-	"strings"
 
-	"github.com/IBM/integrity-shield/admission-controller/pkg/config"
-	"github.com/IBM/integrity-shield/admission-controller/pkg/shield"
-	k8smnfutil "github.com/sigstore/k8s-manifest-sigstore/pkg/util"
 	log "github.com/sirupsen/logrus"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	corev1 "k8s.io/api/core/v1"
 
-	miprofile "github.com/IBM/integrity-shield/admission-controller/pkg/apis/manifestintegrityprofile/v1alpha1"
+	ac "github.com/IBM/integrity-shield/admission-controller/pkg/shield"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -55,122 +50,10 @@ type k8sManifestHandler struct {
 	Client client.Client
 }
 
-type AccumulatedResult struct {
-	Allow   bool
-	Message string
-}
-
 func (h *k8sManifestHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-
 	log.Info("[DEBUG] request: ", req.Kind, ", ", req.Name)
-
-	// load constraints
-	constraints, err := config.LoadConstraints()
-	if err != nil {
-		log.Errorf("failed to load manifest integrity config; %s", err.Error())
-		return admission.Allowed("error but allow for development")
-	}
-
-	results := []shield.ResultFromRequestHandler{}
-
-	for _, constraint := range constraints {
-
-		//match check: kind, namespace
-		isMatched := matchCheck(req, constraint.Match)
-		if !isMatched {
-			r := shield.ResultFromRequestHandler{
-				Allow:   true,
-				Message: "not protected",
-			}
-			results = append(results, r)
-			continue
-		}
-
-		// pick parameters from constaint
-		paramObj := config.GetParametersFromConstraint(constraint)
-
-		// call request handler & receive result from request handler (allow, message)
-		useRemote, _ := strconv.ParseBool(os.Getenv("USE_REMOTE_HANDLER"))
-		r := shield.RequestHandlerController(useRemote, req, paramObj)
-		// r := shield.RequestHandler(req, paramObj)
-
-		results = append(results, *r)
-	}
-
-	// accumulate results from constraints
-	ar := getAccumulatedResult(results)
-
-	// TODO: generate events
-
-	// TODO: update status
-
-	// return admission response
-	log.Info("[DEBUG] process result: ", ar.Allow, ", ", ar.Message)
-	if ar.Allow {
-		return admission.Allowed(ar.Message)
-	} else {
-		return admission.Denied(ar.Message)
-	}
-}
-
-func matchCheck(req admission.Request, match miprofile.MatchCondition) bool {
-	// check if excludedNamespace
-	for _, ens := range match.ExcludedNamespaces {
-		if k8smnfutil.MatchPattern(ens, req.Namespace) {
-			return false
-		}
-	}
-	// check if matched kind/namespace
-	nsMatched := false
-	kindMatched := false
-	if len(match.Namespaces) == 0 {
-		nsMatched = true
-	} else {
-		// check if cluster scope
-		if req.Namespace == "" {
-			nsMatched = true
-		}
-		for _, ns := range match.Namespaces {
-			if k8smnfutil.MatchPattern(ns, req.Namespace) {
-				nsMatched = true
-			}
-		}
-	}
-	if len(match.Kinds) == 0 {
-		kindMatched = true
-	} else {
-		for _, ns := range match.Kinds {
-			if k8smnfutil.MatchPattern(ns, req.Kind.Kind) {
-				kindMatched = true
-			}
-		}
-	}
-	if nsMatched && kindMatched {
-		return true
-	}
-	return false
-}
-
-func getAccumulatedResult(results []shield.ResultFromRequestHandler) *AccumulatedResult {
-	denyMessages := []string{}
-	allowMessages := []string{}
-	accumulatedRes := &AccumulatedResult{}
-	for _, result := range results {
-		if !result.Allow {
-			accumulatedRes.Message = result.Message
-			denyMessages = append(denyMessages, result.Message)
-		} else {
-			allowMessages = append(allowMessages, result.Message)
-		}
-	}
-	if len(denyMessages) != 0 {
-		accumulatedRes.Allow = false
-		accumulatedRes.Message = strings.Join(denyMessages, ";")
-		return accumulatedRes
-	}
-	accumulatedRes.Allow = true
-	accumulatedRes.Message = strings.Join(allowMessages, ";")
-	return accumulatedRes
+	res := ac.ProcessRequest(req)
+	return res
 }
 
 func init() {

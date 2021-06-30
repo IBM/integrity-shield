@@ -17,7 +17,6 @@
 package config
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -25,56 +24,30 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 
-	miprofile "github.com/IBM/integrity-shield/admission-controller/pkg/apis/manifestintegrityprofile/v1alpha1"
-	mipclient "github.com/IBM/integrity-shield/admission-controller/pkg/client/manifestintegrityprofile/clientset/versioned/typed/manifestintegrityprofile/v1alpha1"
+	"github.com/sigstore/k8s-manifest-sigstore/pkg/k8smanifest"
 	"github.com/sigstore/k8s-manifest-sigstore/pkg/util/kubeutil"
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func GetParametersFromConstraint(constraint miprofile.ManifestIntegrityProfileSpec) *miprofile.ParameterObject {
-	return &constraint.Parameters
+type HandlerConfig struct {
+	ImageVerificationConfig ImageVerificationConfig `json:"imageVerificationConfig,omitempty"`
+	KeyPathList             []string                `json:"keyPathList,omitempty"`
+	SigStoreConfig          SigStoreConfig          `json:"sigStoreConfig,omitempty"`
+	RequestFilterProfile    RequestFilterProfile    `json:"requestFilterProfile,omitempty"`
+	Options                 []string
 }
 
-func LoadConstraints() ([]miprofile.ManifestIntegrityProfileSpec, error) {
-	manifestIntegrityProfileList, err := loadManifestIntegiryProfiles()
-	if err != nil {
-		return []miprofile.ManifestIntegrityProfileSpec{}, err
-	}
-	if manifestIntegrityProfileList == nil {
-		return []miprofile.ManifestIntegrityProfileSpec{}, nil
-	}
-	constraints := loadConstraintsFromProfileList(manifestIntegrityProfileList)
-	return constraints, nil
+type ImageVerificationConfig struct {
 }
 
-func loadConstraintsFromProfileList(miplist *miprofile.ManifestIntegrityProfileList) []miprofile.ManifestIntegrityProfileSpec {
-	var constraints []miprofile.ManifestIntegrityProfileSpec
-	for _, mip := range miplist.Items {
-		constraints = append(constraints, mip.Spec)
-	}
-	return constraints
+type SigStoreConfig struct {
 }
 
-func loadManifestIntegiryProfiles() (*miprofile.ManifestIntegrityProfileList, error) {
-	// TODO: kubeconfig
-	config, err := kubeutil.GetKubeConfig()
-	if err != nil {
-		return nil, nil
-	}
-	clientset, err := mipclient.NewForConfig(config)
-	if err != nil {
-		log.Error(err)
-		return nil, nil
-	}
-	miplist, err := clientset.ManifestIntegrityProfiles().List(context.Background(), metav1.ListOptions{})
-	if err != nil {
-		log.Error("failed to get ManifestIntegrityProfiles:", err.Error())
-		return nil, nil
-	}
-	return miplist, nil
+type RequestFilterProfile struct {
+	SkipObjects  k8smanifest.ObjectReferenceList    `json:"skipObjects,omitempty"`
+	SkipUsers    ObjectUserBindingList              `json:"skipUsers,omitempty"`
+	IgnoreFields k8smanifest.ObjectFieldBindingList `json:"ignoreFields,omitempty"`
 }
 
 func LoadKeySecret(keySecertNamespace, keySecertName string) (string, error) {

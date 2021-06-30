@@ -1,4 +1,4 @@
-commonProfile: 
+requestFilterProfile: 
   skipObjects:
   - kind: ConfigMap
     name: kube-root-ca.crt

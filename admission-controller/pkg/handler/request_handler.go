@@ -14,7 +14,7 @@
 // limitations under the License.
 //
 
-package shield
+package handler
 
 import (
 	"bytes"
@@ -24,8 +24,8 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	miprofile "github.com/IBM/integrity-shield/admission-controller/pkg/apis/manifestintegrityprofile/v1alpha1"
 	k8smnfconfig "github.com/IBM/integrity-shield/admission-controller/pkg/config"
+	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 	"github.com/sigstore/k8s-manifest-sigstore/pkg/k8smanifest"
 	"github.com/sigstore/k8s-manifest-sigstore/pkg/util/kubeutil"
@@ -39,11 +39,11 @@ import (
 )
 
 const remoteRequestHandlerURL = "https://integrity-shield-api.k8s-manifest-sigstore.svc:8123/api/request"
-const configKeyInConfigMap = "config.json"
+const configKeyInConfigMap = "config.yaml"
 const defaultPodNamespace = "k8s-manifest-sigstore"
 const ishieldConfigMapName = "k8s-manifest-integrity-config"
 
-func RequestHandlerController(remote bool, req admission.Request, paramObj *miprofile.ParameterObject) *ResultFromRequestHandler {
+func RequestHandlerController(remote bool, req admission.Request, paramObj *k8smnfconfig.ParameterObject) *ResultFromRequestHandler {
 	r := &ResultFromRequestHandler{}
 	if remote {
 		log.Info("[DEBUG] remote request handler ", remoteRequestHandlerURL)
@@ -98,7 +98,7 @@ func RequestHandlerController(remote bool, req admission.Request, paramObj *mipr
 	return r
 }
 
-func RequestHandler(req admission.Request, paramObj *miprofile.ParameterObject) *ResultFromRequestHandler {
+func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObject) *ResultFromRequestHandler {
 	// unmarshal admission request object
 	// load Resource from Admission request
 	var resource unstructured.Unstructured
@@ -113,7 +113,7 @@ func RequestHandler(req admission.Request, paramObj *miprofile.ParameterObject) 
 	}
 
 	// load shield config
-	isconfig, err := loadShieldConfig()
+	rhconfig, err := loadRequestHandlerConfig()
 	if err != nil {
 		log.Errorf("failed to load shield config", err.Error())
 		return &ResultFromRequestHandler{
@@ -123,11 +123,11 @@ func RequestHandler(req admission.Request, paramObj *miprofile.ParameterObject) 
 	}
 	commonSkipUserMatched := false
 	skipObjectMatched := false
-	if isconfig != nil {
+	if rhconfig != nil {
 		//filter by user listed in common profile
-		commonSkipUserMatched = isconfig.CommonProfile.SkipUsers.Match(resource, req.AdmissionRequest.UserInfo.Username)
+		commonSkipUserMatched = rhconfig.RequestFilterProfile.SkipUsers.Match(resource, req.AdmissionRequest.UserInfo.Username)
 		// ignore object
-		skipObjectMatched = isconfig.CommonProfile.SkipObjects.Match(resource)
+		skipObjectMatched = rhconfig.RequestFilterProfile.SkipObjects.Match(resource)
 	}
 
 	// Proccess with parameter
@@ -139,7 +139,7 @@ func RequestHandler(req admission.Request, paramObj *miprofile.ParameterObject) 
 
 	// mutation check
 	if isUpdateRequest(req.AdmissionRequest.Operation) {
-		ignoreFields := getMatchedIgnoreFields(paramObj.IgnoreFields, isconfig.CommonProfile.IgnoreFields, resource)
+		ignoreFields := getMatchedIgnoreFields(paramObj.IgnoreFields, rhconfig.RequestFilterProfile.IgnoreFields, resource)
 		mutated, err := mutationCheck(req.AdmissionRequest.OldObject.Raw, req.AdmissionRequest.Object.Raw, ignoreFields)
 		if err != nil {
 			log.Errorf("failed to check mutation", err.Error())
@@ -176,7 +176,7 @@ func RequestHandler(req admission.Request, paramObj *miprofile.ParameterObject) 
 		if paramObj.KeySecertName != "" {
 			keyPath, _ = k8smnfconfig.LoadKeySecret(paramObj.KeySecertNamespace, paramObj.KeySecertName)
 		}
-		vo := setVerifyOption(&paramObj.VerifyOption, isconfig)
+		vo := setVerifyOption(&paramObj.VerifyOption, rhconfig)
 		//vo := &(paramObj.VerifyOption)
 		// call VerifyResource with resource, verifyOption, keypath, imageRef
 		result, err := k8smanifest.VerifyResource(resource, imageRef, keyPath, vo)
@@ -222,18 +222,6 @@ func RequestHandler(req admission.Request, paramObj *miprofile.ParameterObject) 
 type ResultFromRequestHandler struct {
 	Allow   bool
 	Message string
-}
-
-type CommonProfile struct {
-	SkipObjects  k8smanifest.ObjectReferenceList    `json:"skipObjects,omitempty"`
-	SkipUsers    miprofile.ObjectUserBindingList    `json:"skipUsers,omitempty"`
-	IgnoreFields k8smanifest.ObjectFieldBindingList `json:"ignoreFields,omitempty"`
-}
-
-type ShieldConfig struct {
-	// Log        *LoggingScopeConfig `json:"log,omitempty"`
-	// SideEffect *SideEffectConfig   `json:"sideEffect,omitempty"`
-	CommonProfile CommonProfile `json:"commonProfile,omitempty"`
 }
 
 func isUpdateRequest(operation v1.Operation) bool {
@@ -294,24 +282,24 @@ func mutationCheck(rawOldObject, rawObject []byte, IgnoreFields []string) (bool,
 	return true, nil
 }
 
-func setVerifyOption(vo *k8smanifest.VerifyOption, isconfig *ShieldConfig) *k8smanifest.VerifyOption {
-	if isconfig == nil {
+func setVerifyOption(vo *k8smanifest.VerifyOption, config *k8smnfconfig.HandlerConfig) *k8smanifest.VerifyOption {
+	if config == nil {
 		return vo
 	}
 	fields := k8smanifest.ObjectFieldBindingList{}
 	fields = append(fields, vo.IgnoreFields...)
-	fields = append(fields, isconfig.CommonProfile.IgnoreFields...)
+	fields = append(fields, config.RequestFilterProfile.IgnoreFields...)
 	vo.IgnoreFields = fields
 	log.Info("[DEBUG] setVerifyOption: ", vo)
 	return vo
 }
 
-func loadShieldConfig() (*ShieldConfig, error) {
+func loadRequestHandlerConfig() (*k8smnfconfig.HandlerConfig, error) {
 	log.Info("[DEBUG] loadShieldConfig: ", defaultPodNamespace, ", ", ishieldConfigMapName)
 	obj, err := kubeutil.GetResource("v1", "ConfigMap", defaultPodNamespace, ishieldConfigMapName)
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
-			log.Info("[DEBUG] loadShieldConfig NotFound")
+			log.Info("[DEBUG] loadHandlerConfig NotFound")
 			return nil, nil
 		}
 		return nil, errors.Wrap(err, fmt.Sprintf("failed to get a configmap `%s` in `%s` namespace", ishieldConfigMapName, defaultPodNamespace))
@@ -323,16 +311,16 @@ func loadShieldConfig() (*ShieldConfig, error) {
 	if !found {
 		return nil, errors.New(fmt.Sprintf("`%s` is not found in configmap", configKeyInConfigMap))
 	}
-	var sc *ShieldConfig
-	_ = json.Unmarshal([]byte(cfgBytes), &sc)
-	// if err != nil {
-	// 	return sc, errors.Wrap(err, fmt.Sprintf("failed to unmarshal config.yaml into %T", sc))
-	// }
-	log.Info("[DEBUG] ShieldConfig: ", sc)
+	var sc *k8smnfconfig.HandlerConfig
+	err = yaml.Unmarshal([]byte(cfgBytes), &sc)
+	if err != nil {
+		return sc, errors.Wrap(err, fmt.Sprintf("failed to unmarshal config.yaml into %T", sc))
+	}
+	log.Info("[DEBUG] HandlerConfig: ", sc)
 	return sc, nil
 }
 
 type RemoteRequestHandlerInputMap struct {
-	Request   admission.Request         `json:"request,omitempty"`
-	Parameter miprofile.ParameterObject `json:"parameters,omitempty"`
+	Request   admission.Request            `json:"request,omitempty"`
+	Parameter k8smnfconfig.ParameterObject `json:"parameters,omitempty"`
 }

@@ -17,11 +17,9 @@
 package v1alpha1
 
 import (
+	k8smnfconfig "github.com/IBM/integrity-shield/admission-controller/pkg/config"
 	"github.com/jinzhu/copier"
-	"github.com/sigstore/k8s-manifest-sigstore/pkg/k8smanifest"
-	k8smnfutil "github.com/sigstore/k8s-manifest-sigstore/pkg/util"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 var layout = "2006-01-02 15:04:05"
@@ -30,30 +28,14 @@ const maxHistoryLength = 3
 
 // ManifestIntegrityProfileSpec defines the desired state of AppEnforcePolicy
 type ManifestIntegrityProfileSpec struct {
-	Match      MatchCondition  `json:"match,omitempty"`
-	Parameters ParameterObject `json:"parameters,omitempty"`
+	Match      MatchCondition               `json:"match,omitempty"`
+	Parameters k8smnfconfig.ParameterObject `json:"parameters,omitempty"`
 }
 
 type MatchCondition struct {
 	Kinds              []string `json:"kinds,omitempty"`
 	Namespaces         []string `json:"namespaces,omitempty"`
 	ExcludedNamespaces []string `json:"excludedNamespaces,omitempty"`
-}
-
-type ParameterObject struct {
-	k8smanifest.VerifyOption `json:""`
-	InScopeObjects           k8smanifest.ObjectReferenceList `json:"inScopeObjects,omitempty"`
-	SkipUsers                ObjectUserBindingList           `json:"skipUsers,omitempty"`
-	KeySecertName            string                          `json:"keySecretName,omitempty"`
-	KeySecertNamespace       string                          `json:"keySecretNamespace,omitempty"`
-	ImageRef                 string                          `json:"imageRef,omitempty"`
-}
-
-type ObjectUserBindingList []ObjectUserBinding
-
-type ObjectUserBinding struct {
-	Objects k8smanifest.ObjectReferenceList `json:"objects,omitempty"`
-	Users   []string                        `json:"users,omitempty"`
 }
 
 // ManifestIntegrityProfileStatus defines the observed state of AppEnforcePolicy
@@ -87,31 +69,6 @@ type ManifestIntegrityProfileList struct {
 	Items           []ManifestIntegrityProfile `json:"items"`
 }
 
-func (p *ParameterObject) DeepCopyInto(p2 *ParameterObject) {
-	copier.Copy(&p2, &p)
-}
-
 func (p *MatchCondition) DeepCopyInto(p2 *MatchCondition) {
 	copier.Copy(&p2, &p)
-}
-
-func (u ObjectUserBinding) Match(obj unstructured.Unstructured, username string) bool {
-	if u.Objects.Match(obj) {
-		if k8smnfutil.MatchWithPatternArray(username, u.Users) {
-			return true
-		}
-	}
-	return false
-}
-
-func (l ObjectUserBindingList) Match(obj unstructured.Unstructured, username string) bool {
-	if len(l) == 0 {
-		return false
-	}
-	for _, u := range l {
-		if u.Match(obj, username) {
-			return true
-		}
-	}
-	return false
 }

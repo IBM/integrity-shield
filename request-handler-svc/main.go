@@ -24,8 +24,8 @@ import (
 	"net/http"
 	"path"
 
-	miprofile "github.com/IBM/integrity-shield/admission-controller/pkg/apis/manifestintegrityprofile/v1alpha1"
-	"github.com/IBM/integrity-shield/admission-controller/pkg/shield"
+	k8smnfconfig "github.com/IBM/integrity-shield/admission-controller/pkg/config"
+	"github.com/IBM/integrity-shield/admission-controller/pkg/handler"
 	log "github.com/sirupsen/logrus"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
@@ -69,7 +69,7 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 	body := bufbody.Bytes()
 	var inputMap map[string]interface{}
 	var request *admission.Request
-	var parameters *miprofile.ParameterObject
+	var parameters *k8smnfconfig.ParameterObject
 	err := json.Unmarshal(body, &inputMap)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("unmarshaling input data as map[string]interface{}: %v", err), http.StatusInternalServerError)
@@ -105,7 +105,7 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fmt.Println("parameters:", parameters)
-	result := shield.RequestHandler(*request, parameters)
+	result := handler.RequestHandler(*request, parameters)
 
 	resp, err := json.Marshal(result)
 	if err != nil {

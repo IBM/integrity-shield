@@ -4,6 +4,7 @@ go 1.16
 
 require (
 	github.com/fatih/color v1.12.0 // indirect
+	github.com/ghodss/yaml v1.0.0
 	github.com/jinzhu/copier v0.3.2
 	github.com/onsi/ginkgo v1.16.4 // indirect
 	github.com/onsi/gomega v1.13.0 // indirect
