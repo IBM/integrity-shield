@@ -18,7 +18,6 @@ package shield
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -33,9 +32,8 @@ import (
 	k8smnfutil "github.com/sigstore/k8s-manifest-sigstore/pkg/util"
 	"github.com/sigstore/k8s-manifest-sigstore/pkg/util/kubeutil"
 	log "github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kubeclient "k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -107,7 +105,8 @@ func ProcessRequest(req admission.Request) admission.Response {
 	// TODO: update status
 
 	// return admission response
-	log.Info("[DEBUG] process result: ", ar.Allow, ", ", ar.Message)
+	logMsg := fmt.Sprintf("%s %s %s > %s %s", req.Kind.Kind, req.Name, req.Operation, strconv.FormatBool(ar.Allow), ar.Message)
+	log.Info("[DEBUG] AC2 result: ", logMsg)
 	if ar.Allow {
 		return admission.Allowed(ar.Message)
 	} else {
@@ -133,18 +132,32 @@ func loadShieldConfig() (*k8smnfconfig.ShieldConfig, error) {
 		configKey = configKeyInConfigMap
 	}
 	// load
-	log.Info("[DEBUG] loadShieldConfig: ", namespace, ", ", configName)
-	obj, err := kubeutil.GetResource("v1", "ConfigMap", namespace, configName)
+	// log.Info("[DEBUG] loadShieldConfig: ", namespace, ", ", configName)
+	config, err := kubeutil.GetKubeConfig()
 	if err != nil {
-		if k8serrors.IsNotFound(err) {
-			log.Info("[DEBUG] ShieldConfig NotFound")
-			return nil, nil
-		}
+		return nil, nil
+	}
+	clientset, err := kubeclient.NewForConfig(config)
+	if err != nil {
+		log.Error(err)
+		return nil, nil
+	}
+	cm, err := clientset.CoreV1().ConfigMaps(namespace).Get(context.Background(), configName, metav1.GetOptions{})
+	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("failed to get a configmap `%s` in `%s` namespace", configName, namespace))
 	}
-	objBytes, _ := json.Marshal(obj.Object)
-	var cm corev1.ConfigMap
-	_ = json.Unmarshal(objBytes, &cm)
+
+	// obj, err := kubeutil.GetResource("v1", "ConfigMap", namespace, configName)
+	// if err != nil {
+	// 	if k8serrors.IsNotFound(err) {
+	// 		log.Info("[DEBUG] ShieldConfig NotFound")
+	// 		return nil, nil
+	// 	}
+	// 	return nil, errors.Wrap(err, fmt.Sprintf("failed to get a configmap `%s` in `%s` namespace", configName, namespace))
+	// }
+	// objBytes, _ := json.Marshal(obj.Object)
+	// var cm corev1.ConfigMap
+	// _ = json.Unmarshal(objBytes, &cm)
 	cfgBytes, found := cm.Data[configKeyInConfigMap]
 	if !found {
 		return nil, errors.New(fmt.Sprintf("`%s` is not found in configmap", configKeyInConfigMap))
@@ -154,7 +167,7 @@ func loadShieldConfig() (*k8smnfconfig.ShieldConfig, error) {
 	if err != nil {
 		return sc, errors.Wrap(err, fmt.Sprintf("failed to unmarshal config.yaml into %T", sc))
 	}
-	log.Info("[DEBUG] ShieldConfig: ", sc)
+	// log.Info("[DEBUG] ShieldConfig: ", sc)
 	return sc, nil
 }
 

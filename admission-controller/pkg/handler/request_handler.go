@@ -18,12 +18,16 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strconv"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	k8smnfconfig "github.com/IBM/integrity-shield/admission-controller/pkg/config"
 	"github.com/ghodss/yaml"
@@ -33,9 +37,8 @@ import (
 	"github.com/sigstore/k8s-manifest-sigstore/pkg/util/mapnode"
 	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/admission/v1"
-	corev1 "k8s.io/api/core/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	kubeclient "k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -47,7 +50,6 @@ const handlerConfigMapName = "k8s-manifest-integrity-config"
 func RequestHandlerController(remote bool, req admission.Request, paramObj *k8smnfconfig.ParameterObject) *ResultFromRequestHandler {
 	r := &ResultFromRequestHandler{}
 	if remote {
-		log.Info("[DEBUG] remote request handler ", remoteRequestHandlerURL)
 		// http call to remote request handler service
 		input := &RemoteRequestHandlerInputMap{
 			Request:   req,
@@ -150,7 +152,6 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 			}
 		}
 		if !mutated {
-			log.Info("[DEBUG] Mutation check: no mutation found")
 			return &ResultFromRequestHandler{
 				Allow:   true,
 				Message: "no mutation found",
@@ -215,7 +216,8 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 	}
 
 	// log
-	log.Info("[DEBUG] result:", r.Message)
+	logMsg := fmt.Sprintf("%s %s %s > %s %s", req.Kind.Kind, req.Name, req.Operation, strconv.FormatBool(r.Allow), r.Message)
+	log.Info("[DEBUG] RequestHandler result: ", logMsg)
 
 	return r
 }
@@ -310,18 +312,30 @@ func loadRequestHandlerConfig() (*k8smnfconfig.RequestHandlerConfig, error) {
 	}
 
 	// load
-	log.Info("[DEBUG] loadRequestHandlerConfig: ", defaultPodNamespace, ", ", handlerConfigMapName)
-	obj, err := kubeutil.GetResource("v1", "ConfigMap", defaultPodNamespace, handlerConfigMapName)
+	config, err := kubeutil.GetKubeConfig()
 	if err != nil {
-		if k8serrors.IsNotFound(err) {
-			log.Info("[DEBUG] RequestHandlerConfig NotFound")
-			return nil, nil
-		}
-		return nil, errors.Wrap(err, fmt.Sprintf("failed to get a configmap `%s` in `%s` namespace", handlerConfigMapName, defaultPodNamespace))
+		return nil, nil
 	}
-	objBytes, _ := json.Marshal(obj.Object)
-	var cm corev1.ConfigMap
-	_ = json.Unmarshal(objBytes, &cm)
+	clientset, err := kubeclient.NewForConfig(config)
+	if err != nil {
+		log.Error(err)
+		return nil, nil
+	}
+	cm, err := clientset.CoreV1().ConfigMaps(namespace).Get(context.Background(), configName, metav1.GetOptions{})
+	if err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("failed to get a configmap `%s` in `%s` namespace", configName, namespace))
+	}
+	// obj, err := kubeutil.GetResource("v1", "ConfigMap", defaultPodNamespace, handlerConfigMapName)
+	// if err != nil {
+	// 	if k8serrors.IsNotFound(err) {
+	// 		log.Info("[DEBUG] RequestHandlerConfig NotFound")
+	// 		return nil, nil
+	// 	}
+	// 	return nil, errors.Wrap(err, fmt.Sprintf("failed to get a configmap `%s` in `%s` namespace", handlerConfigMapName, defaultPodNamespace))
+	// }
+	// objBytes, _ := json.Marshal(obj.Object)
+	// var cm corev1.ConfigMap
+	// _ = json.Unmarshal(objBytes, &cm)
 	cfgBytes, found := cm.Data[configKeyInConfigMap]
 	if !found {
 		return nil, errors.New(fmt.Sprintf("`%s` is not found in configmap", configKeyInConfigMap))
@@ -331,7 +345,7 @@ func loadRequestHandlerConfig() (*k8smnfconfig.RequestHandlerConfig, error) {
 	if err != nil {
 		return sc, errors.Wrap(err, fmt.Sprintf("failed to unmarshal config.yaml into %T", sc))
 	}
-	log.Info("[DEBUG] HandlerConfig: ", sc)
+	// log.Info("[DEBUG] HandlerConfig: ", sc)
 	return sc, nil
 }
 
