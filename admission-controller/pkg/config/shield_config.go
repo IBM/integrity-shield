@@ -24,7 +24,6 @@ import (
 type ShieldConfig struct {
 	InScopeNamespaceSelector NamespaceSelector `json:"inScopeNamespaceSelector,omitempty"`
 	Allow                    Allow             `json:"allow,omitempty"`
-	Log                      LogConfig         `json:"log,omitempty"`
 	SideEffect               SideEffectConfig  `json:"sideEffect,omitempty"`
 	Patch                    PatchConfig       `json:"skipObjects,omitempty"`
 	Mode                     string            `json:"mode,omitempty"`
@@ -33,11 +32,8 @@ type ShieldConfig struct {
 
 type NamespaceSelector struct {
 	// TODO: check how include works, match in constraint
-	// Include []string `json:"include,omitempty"`
+	Include []string `json:"include,omitempty"`
 	Exclude []string `json:"exclude,omitempty"`
-}
-
-type LogConfig struct {
 }
 
 type Allow struct {
@@ -58,10 +54,18 @@ type PatchConfig struct {
 
 func (ns NamespaceSelector) Match(rns string) bool {
 	excluded := false
+	included := false
 	if len(ns.Exclude) != 0 {
 		excluded = k8smnfutil.MatchWithPatternArray(rns, ns.Exclude)
 	}
-	if excluded {
+	if len(ns.Include) != 0 {
+		included = k8smnfutil.MatchWithPatternArray(rns, ns.Include)
+	} else {
+		included = true
+	}
+	if included && excluded {
+		return false
+	} else if !included {
 		return false
 	}
 	return true

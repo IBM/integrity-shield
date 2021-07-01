@@ -283,7 +283,7 @@ func mutationCheck(rawOldObject, rawObject []byte, IgnoreFields []string) (bool,
 	return true, nil
 }
 
-func setVerifyOption(vo *k8smanifest.VerifyOption, config *k8smnfconfig.ManifestIntegrityConfig) *k8smanifest.VerifyOption {
+func setVerifyOption(vo *k8smanifest.VerifyOption, config *k8smnfconfig.RequestHandlerConfig) *k8smanifest.VerifyOption {
 	if config == nil {
 		return vo
 	}
@@ -295,7 +295,7 @@ func setVerifyOption(vo *k8smanifest.VerifyOption, config *k8smnfconfig.Manifest
 	return vo
 }
 
-func loadRequestHandlerConfig() (*k8smnfconfig.ManifestIntegrityConfig, error) {
+func loadRequestHandlerConfig() (*k8smnfconfig.RequestHandlerConfig, error) {
 	namespace := os.Getenv("POD_NAMESPACE")
 	if namespace == "" {
 		namespace = defaultPodNamespace
@@ -310,11 +310,11 @@ func loadRequestHandlerConfig() (*k8smnfconfig.ManifestIntegrityConfig, error) {
 	}
 
 	// load
-	log.Info("[DEBUG] loadManifestIntegrityConfig: ", defaultPodNamespace, ", ", handlerConfigMapName)
+	log.Info("[DEBUG] loadRequestHandlerConfig: ", defaultPodNamespace, ", ", handlerConfigMapName)
 	obj, err := kubeutil.GetResource("v1", "ConfigMap", defaultPodNamespace, handlerConfigMapName)
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
-			log.Info("[DEBUG] ManifestIntegrityConfig NotFound")
+			log.Info("[DEBUG] RequestHandlerConfig NotFound")
 			return nil, nil
 		}
 		return nil, errors.Wrap(err, fmt.Sprintf("failed to get a configmap `%s` in `%s` namespace", handlerConfigMapName, defaultPodNamespace))
@@ -326,7 +326,7 @@ func loadRequestHandlerConfig() (*k8smnfconfig.ManifestIntegrityConfig, error) {
 	if !found {
 		return nil, errors.New(fmt.Sprintf("`%s` is not found in configmap", configKeyInConfigMap))
 	}
-	var sc *k8smnfconfig.ManifestIntegrityConfig
+	var sc *k8smnfconfig.RequestHandlerConfig
 	err = yaml.Unmarshal([]byte(cfgBytes), &sc)
 	if err != nil {
 		return sc, errors.Wrap(err, fmt.Sprintf("failed to unmarshal config.yaml into %T", sc))
