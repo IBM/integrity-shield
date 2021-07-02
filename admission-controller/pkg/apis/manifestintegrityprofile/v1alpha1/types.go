@@ -33,9 +33,11 @@ type ManifestIntegrityProfileSpec struct {
 }
 
 type MatchCondition struct {
-	Kinds              []Kinds  `json:"kinds,omitempty"`
-	Namespaces         []string `json:"namespaces,omitempty"`
-	ExcludedNamespaces []string `json:"excludedNamespaces,omitempty"`
+	Kinds              []Kinds               `json:"kinds,omitempty"`
+	Namespaces         []string              `json:"namespaces,omitempty"`
+	ExcludedNamespaces []string              `json:"excludedNamespaces,omitempty"`
+	LabelSelector      *metav1.LabelSelector `json:"labelSelector,omitempty"`
+	NamespaceSelector  *metav1.LabelSelector `json:"namespaceSelector,omitempty"`
 }
 
 type Kinds struct {

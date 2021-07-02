@@ -43,9 +43,9 @@ import (
 )
 
 const remoteRequestHandlerURL = "https://integrity-shield-api.k8s-manifest-sigstore.svc:8123/api/request"
-const configKeyInConfigMap = "config.yaml"
+const defaultConfigKeyInConfigMap = "config.yaml"
 const defaultPodNamespace = "k8s-manifest-sigstore"
-const handlerConfigMapName = "k8s-manifest-integrity-config"
+const defaultHandlerConfigMapName = "k8s-manifest-integrity-config"
 
 func RequestHandlerController(remote bool, req admission.Request, paramObj *k8smnfconfig.ParameterObject) *ResultFromRequestHandler {
 	r := &ResultFromRequestHandler{}
@@ -304,11 +304,11 @@ func loadRequestHandlerConfig() (*k8smnfconfig.RequestHandlerConfig, error) {
 	}
 	configName := os.Getenv("MANIFEST_INTEGRITY_CONFIG_NAME")
 	if configName == "" {
-		configName = handlerConfigMapName
+		configName = defaultHandlerConfigMapName
 	}
 	configKey := os.Getenv("MANIFEST_INTEGRITY_CONFIG_KEY")
 	if configKey == "" {
-		configKey = configKeyInConfigMap
+		configKey = defaultConfigKeyInConfigMap
 	}
 
 	// load
@@ -336,9 +336,9 @@ func loadRequestHandlerConfig() (*k8smnfconfig.RequestHandlerConfig, error) {
 	// objBytes, _ := json.Marshal(obj.Object)
 	// var cm corev1.ConfigMap
 	// _ = json.Unmarshal(objBytes, &cm)
-	cfgBytes, found := cm.Data[configKeyInConfigMap]
+	cfgBytes, found := cm.Data[configKey]
 	if !found {
-		return nil, errors.New(fmt.Sprintf("`%s` is not found in configmap", configKeyInConfigMap))
+		return nil, errors.New(fmt.Sprintf("`%s` is not found in configmap", configKey))
 	}
 	var sc *k8smnfconfig.RequestHandlerConfig
 	err = yaml.Unmarshal([]byte(cfgBytes), &sc)

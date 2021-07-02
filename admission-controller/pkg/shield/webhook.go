@@ -18,6 +18,7 @@ package shield
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -33,13 +34,15 @@ import (
 	"github.com/sigstore/k8s-manifest-sigstore/pkg/util/kubeutil"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	kubeclient "k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-const configKeyInConfigMap = "config.yaml"
+const defaultConfigKeyInConfigMap = "config.yaml"
 const defaultPodNamespace = "k8s-manifest-sigstore"
-const shieldConfigMapName = "shield-config"
+const defaultShieldConfigMapName = "shield-config"
 
 type AccumulatedResult struct {
 	Allow   bool
@@ -75,7 +78,7 @@ func ProcessRequest(req admission.Request) admission.Response {
 
 	for _, constraint := range constraints {
 
-		//match check: kind, namespace
+		//match check: kind, namespace, label
 		isMatched := matchCheck(req, constraint.Match)
 		if !isMatched {
 			r := handler.ResultFromRequestHandler{
@@ -125,11 +128,11 @@ func loadShieldConfig() (*k8smnfconfig.ShieldConfig, error) {
 	}
 	configName := os.Getenv("SHIELD_CONFIG_NAME")
 	if configName == "" {
-		configName = shieldConfigMapName
+		configName = defaultShieldConfigMapName
 	}
 	configKey := os.Getenv("SHIELD_CONFIG_KEY")
 	if configKey == "" {
-		configKey = configKeyInConfigMap
+		configKey = defaultConfigKeyInConfigMap
 	}
 	// load
 	// log.Info("[DEBUG] loadShieldConfig: ", namespace, ", ", configName)
@@ -147,20 +150,9 @@ func loadShieldConfig() (*k8smnfconfig.ShieldConfig, error) {
 		return nil, errors.Wrap(err, fmt.Sprintf("failed to get a configmap `%s` in `%s` namespace", configName, namespace))
 	}
 
-	// obj, err := kubeutil.GetResource("v1", "ConfigMap", namespace, configName)
-	// if err != nil {
-	// 	if k8serrors.IsNotFound(err) {
-	// 		log.Info("[DEBUG] ShieldConfig NotFound")
-	// 		return nil, nil
-	// 	}
-	// 	return nil, errors.Wrap(err, fmt.Sprintf("failed to get a configmap `%s` in `%s` namespace", configName, namespace))
-	// }
-	// objBytes, _ := json.Marshal(obj.Object)
-	// var cm corev1.ConfigMap
-	// _ = json.Unmarshal(objBytes, &cm)
-	cfgBytes, found := cm.Data[configKeyInConfigMap]
+	cfgBytes, found := cm.Data[configKey]
 	if !found {
-		return nil, errors.New(fmt.Sprintf("`%s` is not found in configmap", configKeyInConfigMap))
+		return nil, errors.New(fmt.Sprintf("`%s` is not found in configmap", configKey))
 	}
 	var sc *k8smnfconfig.ShieldConfig
 	err = yaml.Unmarshal([]byte(cfgBytes), &sc)
@@ -202,26 +194,98 @@ func matchCheck(req admission.Request, match miprofile.MatchCondition) bool {
 			}
 		}
 	}
-	// check if matched kinds/namespace
-	nsMatched := false
-	kindsMatched := false
-	if len(match.Namespaces) == 0 {
-		nsMatched = true
+	// check if matched kinds/namespace/label
+	var nsMatched bool
+	var kindsMatched bool
+	var labelMatched bool
+	var nslabelMatched bool
+	nsMatched = checkNamespaceMatch(req, match.Namespaces)
+	kindsMatched = checkKindMatch(req, match.Kinds)
+	labelMatched = checkLabelMatch(req, match.LabelSelector)
+	nslabelMatched = checkNamespaceLabelMatch(req.Namespace, match.NamespaceSelector)
+
+	// TODO: confirm inScope condition (nsMatch and/or nsLabelMatch)
+	if nsMatched && kindsMatched && nslabelMatched && labelMatched {
+		return true
+	}
+	return false
+}
+
+func checkNamespaceLabelMatch(namespace string, labelSelector *metav1.LabelSelector) bool {
+	if labelSelector == nil {
+		return true
+	}
+	config, err := kubeutil.GetKubeConfig()
+	if err != nil {
+		return false
+	}
+	clientset, err := kubeclient.NewForConfig(config)
+	if err != nil {
+		log.Error(err)
+		return false
+	}
+	ns, err := clientset.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
+	if err != nil {
+		log.Errorf("failed to get a namespace `%s`:`%s`", namespace, err.Error())
+		return false
+	}
+	selector, err := metav1.LabelSelectorAsSelector(labelSelector)
+	if err != nil {
+		log.Errorf("failed to convert the LabelSelector api type into a struct that implements labels.Selector; %s", err.Error())
+		return false
+	}
+	labelsMap := ns.GetLabels()
+	labelsSet := labels.Set(labelsMap)
+	matched := selector.Matches(labelsSet)
+	return matched
+}
+
+func checkLabelMatch(req admission.Request, labelSelector *metav1.LabelSelector) bool {
+	if labelSelector == nil {
+		return true
+	}
+	var resource unstructured.Unstructured
+	objectBytes := req.AdmissionRequest.Object.Raw
+	err := json.Unmarshal(objectBytes, &resource)
+	if err != nil {
+		log.Errorf("failed to Unmarshal a requested object into %T; %s", resource, err.Error())
+		return false
+	}
+	selector, err := metav1.LabelSelectorAsSelector(labelSelector)
+	if err != nil {
+		log.Errorf("failed to convert the LabelSelector api type into a struct that implements labels.Selector; %s", err.Error())
+		return false
+	}
+	labelsMap := resource.GetLabels()
+	labelsSet := labels.Set(labelsMap)
+	matched := selector.Matches(labelsSet)
+	return matched
+}
+
+func checkNamespaceMatch(req admission.Request, match []string) bool {
+	matched := false
+	if len(match) == 0 {
+		matched = true
 	} else {
 		// check if cluster scope
 		if req.Namespace == "" {
-			nsMatched = true
+			matched = true
 		}
-		for _, ns := range match.Namespaces {
+		for _, ns := range match {
 			if k8smnfutil.MatchPattern(ns, req.Namespace) {
-				nsMatched = true
+				matched = true
 			}
 		}
 	}
-	if len(match.Kinds) == 0 {
-		kindsMatched = true
+	return matched
+}
+
+func checkKindMatch(req admission.Request, match []miprofile.Kinds) bool {
+	matched := false
+	if len(match) == 0 {
+		matched = true
 	} else {
-		for _, kinds := range match.Kinds {
+		for _, kinds := range match {
 			kind := false
 			group := false
 			if len(kinds.Kinds) == 0 {
@@ -243,14 +307,11 @@ func matchCheck(req admission.Request, match miprofile.MatchCondition) bool {
 				}
 			}
 			if kind && group {
-				kindsMatched = true
+				matched = true
 			}
 		}
 	}
-	if nsMatched && kindsMatched {
-		return true
-	}
-	return false
+	return matched
 }
 
 func getAccumulatedResult(results []handler.ResultFromRequestHandler) *AccumulatedResult {
