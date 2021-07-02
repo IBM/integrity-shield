@@ -33,9 +33,14 @@ type ManifestIntegrityProfileSpec struct {
 }
 
 type MatchCondition struct {
-	Kinds              []string `json:"kinds,omitempty"`
+	Kinds              []Kinds  `json:"kinds,omitempty"`
 	Namespaces         []string `json:"namespaces,omitempty"`
 	ExcludedNamespaces []string `json:"excludedNamespaces,omitempty"`
+}
+
+type Kinds struct {
+	Kinds     []string `json:"kinds,omitempty"`
+	ApiGroups []string `json:"apiGroups,omitempty"`
 }
 
 // ManifestIntegrityProfileStatus defines the observed state of AppEnforcePolicy

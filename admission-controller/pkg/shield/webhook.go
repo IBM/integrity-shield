@@ -195,14 +195,16 @@ func LoadConstraints() ([]miprofile.ManifestIntegrityProfileSpec, error) {
 
 func matchCheck(req admission.Request, match miprofile.MatchCondition) bool {
 	// check if excludedNamespace
-	for _, ens := range match.ExcludedNamespaces {
-		if k8smnfutil.MatchPattern(ens, req.Namespace) {
-			return false
+	if len(match.ExcludedNamespaces) != 0 {
+		for _, ens := range match.ExcludedNamespaces {
+			if k8smnfutil.MatchPattern(ens, req.Namespace) {
+				return false
+			}
 		}
 	}
-	// check if matched kind/namespace
+	// check if matched kinds/namespace
 	nsMatched := false
-	kindMatched := false
+	kindsMatched := false
 	if len(match.Namespaces) == 0 {
 		nsMatched = true
 	} else {
@@ -217,15 +219,35 @@ func matchCheck(req admission.Request, match miprofile.MatchCondition) bool {
 		}
 	}
 	if len(match.Kinds) == 0 {
-		kindMatched = true
+		kindsMatched = true
 	} else {
-		for _, ns := range match.Kinds {
-			if k8smnfutil.MatchPattern(ns, req.Kind.Kind) {
-				kindMatched = true
+		for _, kinds := range match.Kinds {
+			kind := false
+			group := false
+			if len(kinds.Kinds) == 0 {
+				kind = true
+			} else {
+				for _, k := range kinds.Kinds {
+					if k8smnfutil.MatchPattern(k, req.Kind.Kind) {
+						kind = true
+					}
+				}
+			}
+			if len(kinds.ApiGroups) == 0 {
+				group = true
+			} else {
+				for _, g := range kinds.ApiGroups {
+					if k8smnfutil.MatchPattern(g, req.Kind.Group) {
+						group = true
+					}
+				}
+			}
+			if kind && group {
+				kindsMatched = true
 			}
 		}
 	}
-	if nsMatched && kindMatched {
+	if nsMatched && kindsMatched {
 		return true
 	}
 	return false
