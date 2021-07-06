@@ -45,7 +45,7 @@ import (
 const remoteRequestHandlerURL = "https://integrity-shield-api.k8s-manifest-sigstore.svc:8123/api/request"
 const defaultConfigKeyInConfigMap = "config.yaml"
 const defaultPodNamespace = "k8s-manifest-sigstore"
-const defaultHandlerConfigMapName = "k8s-manifest-integrity-config"
+const defaultHandlerConfigMapName = "request-handler-config"
 
 func RequestHandlerController(remote bool, req admission.Request, paramObj *k8smnfconfig.ParameterObject) *ResultFromRequestHandler {
 	r := &ResultFromRequestHandler{}
@@ -302,11 +302,11 @@ func loadRequestHandlerConfig() (*k8smnfconfig.RequestHandlerConfig, error) {
 	if namespace == "" {
 		namespace = defaultPodNamespace
 	}
-	configName := os.Getenv("MANIFEST_INTEGRITY_CONFIG_NAME")
+	configName := os.Getenv("REQUEST_HANDLER_CONFIG_NAME")
 	if configName == "" {
 		configName = defaultHandlerConfigMapName
 	}
-	configKey := os.Getenv("MANIFEST_INTEGRITY_CONFIG_KEY")
+	configKey := os.Getenv("REQUEST_HANDLER__CONFIG_KEY")
 	if configKey == "" {
 		configKey = defaultConfigKeyInConfigMap
 	}
@@ -325,17 +325,6 @@ func loadRequestHandlerConfig() (*k8smnfconfig.RequestHandlerConfig, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("failed to get a configmap `%s` in `%s` namespace", configName, namespace))
 	}
-	// obj, err := kubeutil.GetResource("v1", "ConfigMap", defaultPodNamespace, handlerConfigMapName)
-	// if err != nil {
-	// 	if k8serrors.IsNotFound(err) {
-	// 		log.Info("[DEBUG] RequestHandlerConfig NotFound")
-	// 		return nil, nil
-	// 	}
-	// 	return nil, errors.Wrap(err, fmt.Sprintf("failed to get a configmap `%s` in `%s` namespace", handlerConfigMapName, defaultPodNamespace))
-	// }
-	// objBytes, _ := json.Marshal(obj.Object)
-	// var cm corev1.ConfigMap
-	// _ = json.Unmarshal(objBytes, &cm)
 	cfgBytes, found := cm.Data[configKey]
 	if !found {
 		return nil, errors.New(fmt.Sprintf("`%s` is not found in configmap", configKey))

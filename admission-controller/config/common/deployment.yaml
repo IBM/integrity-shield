@@ -28,15 +28,15 @@ spec:
             fieldRef:
               fieldPath: metadata.namespace
         - name: USE_REMOTE_HANDLER
-          value: "true"
+          value: "false"
         - name: SHIELD_CONFIG_KEY
           value: "config.yaml"
         - name: SHIELD_CONFIG_NAME
           value: "shield-config"
-        - name: MANIFEST_INTEGRITY_CONFIG_KEY
+        - name: REQUEST_HANDLER_CONFIG_KEY
           value: "config.yaml"
-        - name: MANIFEST_INTEGRITY_CONFIG_NAME
-          value: "k8s-manifest-integrity-config"
+        - name: REQUEST_HANDLER_CONFIG_NAME
+          value: "request-handler-config"
         ports:
         - containerPort: 9443
           name: validator-port
