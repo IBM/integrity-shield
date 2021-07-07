@@ -179,7 +179,6 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 			keyPath, _ = k8smnfconfig.LoadKeySecret(paramObj.KeySecertNamespace, paramObj.KeySecertName)
 		}
 		vo := setVerifyOption(&paramObj.VerifyOption, rhconfig)
-		//vo := &(paramObj.VerifyOption)
 		// call VerifyResource with resource, verifyOption, keypath, imageRef
 		result, err := k8smanifest.VerifyResource(resource, imageRef, keyPath, vo)
 		log.Info("[DEBUG] result from VerifyResource: ", result)
@@ -293,7 +292,7 @@ func setVerifyOption(vo *k8smanifest.VerifyOption, config *k8smnfconfig.RequestH
 	fields = append(fields, vo.IgnoreFields...)
 	fields = append(fields, config.RequestFilterProfile.IgnoreFields...)
 	vo.IgnoreFields = fields
-	log.Info("[DEBUG] setVerifyOption: ", vo)
+	// log.Info("[DEBUG] setVerifyOption: ", vo)
 	return vo
 }
 
