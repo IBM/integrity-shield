@@ -1,0 +1,61 @@
+apiVersion: templates.gatekeeper.sh/v1beta1
+kind: ConstraintTemplate
+metadata:
+  name: manifestintegrityconstraint
+spec:
+  crd:
+    spec:
+      names:
+        kind: ManifestIntegrityConstraint
+      validation:
+        # Schema for the `parameters` field
+        openAPIV3Schema:
+          properties:
+            options:
+              type: array
+              items: string
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package integrityshieldcheck
+        violation[{"msg": msg}] {
+          not is_ishield_sa
+          is_create_or_update
+          ishield_input := {"parameters":input.parameters, "request":input.review}
+          reqdata := json.marshal(ishield_input)
+          url := "https://integrity-shield-api.k8s-manifest-sigstore.svc:8123/api/request"
+          resp := http_post(url, reqdata)
+          result := json.unmarshal(resp.raw_body)
+          result.allow == false
+          msg := sprintf("denied; %v", [result])
+        }
+        http_post(url, postdata) = resp {
+          resp := http.send({
+            "url": url,
+            "method": "POST",
+            "headers": {
+              "Accept": "application/json",
+              "Content-type": "application/json",
+            },
+            "raw_body": postdata,
+            "tls_insecure_skip_verify": true
+          })
+        }
+        # audit
+        violation[{"msg": msg}] {
+          is_audit
+          ishield_input := {"parameters":input.parameters, "resource":input.review.object}
+          reqdata := json.marshal(ishield_input)
+          url := "https://integrity-shield-api.k8s-manifest-sigstore.svc:8123/api/request"
+          resp := http_post(url, reqdata)
+          res := json.unmarshal(resp.raw_body)
+          not res.result.type == "allow"
+          msg := sprintf("denied; %v", [res.result.message])
+        }
+        is_create_or_update { is_create }
+        is_create_or_update { is_update }
+        is_create { input.review.operation == "CREATE" }
+        is_update { input.review.operation == "UPDATE" }
+        is_audit { input.review.operation = "" }
+        is_ishield_sa { input.review.userInfo.username == "system:serviceaccount:integrity-shield-operator-system:ishield-sa" }
+        # todo: additional protect check
