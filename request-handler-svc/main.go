@@ -76,8 +76,6 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("new request: ", inputMap)
-
 	requestIf, requestFound := inputMap["request"]
 	if !requestFound {
 		http.Error(w, "failed to find `request` key in input object", http.StatusInternalServerError)
