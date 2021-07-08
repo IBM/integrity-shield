@@ -27,8 +27,8 @@ import (
 	miprofile "github.com/IBM/integrity-shield/admission-controller/pkg/apis/manifestintegrityprofile/v1alpha1"
 	mipclient "github.com/IBM/integrity-shield/admission-controller/pkg/client/manifestintegrityprofile/clientset/versioned/typed/manifestintegrityprofile/v1alpha1"
 	acconfig "github.com/IBM/integrity-shield/admission-controller/pkg/config"
-	k8smnfconfig "github.com/IBM/integrity-shield/integrity-shield/pkg/config"
-	"github.com/IBM/integrity-shield/integrity-shield/pkg/shield"
+	k8smnfconfig "github.com/IBM/integrity-shield/integrity-shield-server/pkg/config"
+	"github.com/IBM/integrity-shield/integrity-shield-server/pkg/shield"
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 	k8smnfutil "github.com/sigstore/k8s-manifest-sigstore/pkg/util"
@@ -43,7 +43,7 @@ import (
 
 const defaultConfigKeyInConfigMap = "config.yaml"
 const defaultPodNamespace = "k8s-manifest-sigstore"
-const defaultShieldConfigMapName = "shield-config"
+const defaultControllerConfigName = "k8s-manifest-controller-config"
 
 type AccumulatedResult struct {
 	Allow   bool
@@ -127,11 +127,11 @@ func loadShieldConfig() (*acconfig.ShieldConfig, error) {
 	if namespace == "" {
 		namespace = defaultPodNamespace
 	}
-	configName := os.Getenv("SHIELD_CONFIG_NAME")
+	configName := os.Getenv("CONTROLLER_CONFIG_NAME")
 	if configName == "" {
-		configName = defaultShieldConfigMapName
+		configName = defaultControllerConfigName
 	}
-	configKey := os.Getenv("SHIELD_CONFIG_KEY")
+	configKey := os.Getenv("CONTROLLER_CONFIG_KEY")
 	if configKey == "" {
 		configKey = defaultConfigKeyInConfigMap
 	}

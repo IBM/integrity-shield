@@ -28,7 +28,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	k8smnfconfig "github.com/IBM/integrity-shield/integrity-shield/pkg/config"
+	k8smnfconfig "github.com/IBM/integrity-shield/integrity-shield-server/pkg/config"
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 	"github.com/sigstore/k8s-manifest-sigstore/pkg/k8smanifest"
