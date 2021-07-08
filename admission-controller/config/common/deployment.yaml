@@ -32,7 +32,7 @@ spec:
         - name: CONTROLLER_CONFIG_KEY
           value: "config.yaml"
         - name: CONTROLLER_CONFIG_NAME
-          value: "k8s-manifest-controller-config"
+          value: "manifest-integrity-controller-config"
         - name: REQUEST_HANDLER_CONFIG_KEY
           value: "config.yaml"
         - name: REQUEST_HANDLER_CONFIG_NAME
