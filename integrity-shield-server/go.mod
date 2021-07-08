@@ -1,4 +1,4 @@
-module github.com/IBM/integrity-shield/integrity-shield
+module github.com/IBM/integrity-shield/integrity-shield-server
 
 go 1.16
 
