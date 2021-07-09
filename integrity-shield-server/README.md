@@ -50,7 +50,7 @@ replicaset.apps/ishield-api-5b8fd4cbc6   1         1         1       25s
 
 ### Usage
 
-To enable to check requests by integrity shield, `ConstraintTemplate` and the constraint `ManifestIntegrityConstraint` should be installed.
+To enable checking requests by integrity shield, `ConstraintTemplate` and the constraint `ManifestIntegrityConstraint` should be installed.
 
 ```
 # Deploy the ConstraintTemplate
@@ -59,7 +59,7 @@ $ kubectl create -f ../gatekeeper-constraint/template-manifestintegrityconstrain
 # Deploy the ManifestIntegrityConstraint
 $ kubectl create -f ../gatekeeper-constraint/example/constraint-configmap.yaml
 ```
-In this example, we use the following constraint. This constraint enforces to protect sample-cm configmap in sample-ns.
+In this example, we use the following constraint. This constraint enforces the protection to sample-cm configmap in sample-ns.
 ```
 
 apiVersion: constraints.gatekeeper.sh/v1beta1
@@ -114,10 +114,8 @@ But, some parts can be changed because we define ignoreFields in the profile.
 $ kubectl edit cm sample-cm -n sample-ns
 configmap/sample-cm edited
 
-# Please edit the object below. Lines beginning with a '#' will be ignored,
-# and an empty file will abort the edit. If an error occurs while saving this file will be
-# reopened with the relevant failures.
-#
+$ kubectl get cm sample-cm -n sample-ns -o yaml
+
 apiVersion: v1
 data:
   comment: comment-changed
