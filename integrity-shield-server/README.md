@@ -104,7 +104,6 @@ After the above, any runtime modification without signature will be blocked.
 ```
 $ kubectl edit cm sample-cm -n sample-ns                                                                                 
 error: configmaps "sample-cm" could not be patched: admission webhook "validation.gatekeeper.sh" denied the request: [configmap-constraint] denied; {"allow": false, "message": "diff found: {\"items\":[{\"key\":\"data.key1\",\"values\":{\"after\":\"val1\",\"before\":\"val3\"}}]}"}
-You can run `oc replace -f /var/folders/nz/108klqgd2tnb0m3mm_l3m4x40000gn/T/oc-edit-ho28l.yaml` to try this update again.
 ```
 But, some parts can be changed because we define ignoreFields in the profile.
 ```

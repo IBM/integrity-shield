@@ -21,7 +21,7 @@ admission-controller$ kubectl create -f ../integrity-shield-server/resource/requ
 ```
 After successful installation, you will see the following resources.
 ```
-$ oc get all -n k8s-manifest-sigstore                                  
+$ kubectl get all -n k8s-manifest-sigstore                                  
 NAME                                          READY   STATUS    RESTARTS   AGE
 pod/k8s-manifest-validator-798fc4bb55-9jpkp   1/1     Running   0          18h
 
