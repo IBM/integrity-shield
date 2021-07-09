@@ -47,6 +47,30 @@ spec:
 
 ## admission controller
 This is an admission controller for verifying k8s manifest with sigstore signing. You can use this admission controller instead of OPA/Gatekeeper.
-In this case, you can decide which resources to be protected in the custom resource called `ManifestIntegrityProfile`.
+In this case, you can decide which resources to be protected in the custom resource called `ManifestIntegrityProfile` instead of OPA/Gatekeeper constraint.
+
+The following snippet is an example of `ManifestIntegrityProfile`.
+```
+apiVersion: apis.integrityshield.io/v1alpha1
+kind: ManifestIntegrityProfile
+metadata:
+  name: constraint-configmap
+spec:
+  match:
+    kinds:
+    - kinds:
+      - ConfigMap
+    namespaces:
+    - sample-ns
+  parameters:
+    ignoreFields:
+    - fields:
+      - data.comment
+      objects:
+      - kind: ConfigMap
+    signers:
+    - signer@signer.com
+```
+
 You can set up the admission controller with a few simple steps. Please see [admission controller](./admission-controller/README.md).
 

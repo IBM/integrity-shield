@@ -16,7 +16,7 @@ admission-controller$ make build IMG=<YOUR_IMAGE_NAME>
 admission-controller$ make deploy IMG=<YOUR_IMAGE_NAME>
 
 # Deploy configmaps for the admission controller
-admission-controller$ kubectl create -f resource/manifest-integrity-controller-config.yaml
+admission-controller$ kubectl create -f resource/admission-controller-config.yaml
 admission-controller$ kubectl create -f ../integrity-shield-server/resource/request-handler-config.yaml
 ```
 After successful installation, you will see the following resources.
@@ -72,6 +72,13 @@ spec:
       - kind: ConfigMap
     signers:
     - signer@signer.com
+```
+```
+# Deploy CustomResourceDefinition of the profile
+admission-controller$ kubectl create -f resource/manifest_integrity_profile_crd.yaml
+
+# Deploy ManifestIntegrityProfile
+admission-controller$ kubectl create -f resource/example/profile-configmap.yaml
 ```
 
 First, creating a ConfigMap in a target namespace without signature will be blocked.
