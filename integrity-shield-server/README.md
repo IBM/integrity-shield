@@ -7,7 +7,7 @@ $ kubectl apply -f https://raw.githubusercontent.com/open-policy-agent/gatekeepe
 ```
 
 ### Setup
-You can setup integiryt shield server just by the following commands.
+You can setup integrity shield server just by the following commands.
 
 Please specify an image which you can push there and which can be pulled from the cluster as <YOUR_IMAGE_NAME>.
 
