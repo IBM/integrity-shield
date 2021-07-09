@@ -8,8 +8,8 @@ Also, you can use the [admission controller](./admission-controller/README.md) i
 
 ## integrity shield server
 
-Integrity shield server includes the main logic to verify admission request. 
-Integrity shield server recieves a k8s resource from OPA/Gatekeeper, validates the resource which is included in the admission request based on the profile and sends the verification result to OPA/Gatekeeper.
+Integrity shield server includes the main logic to verify admission requests. 
+Integrity shield server receives a k8s resource from OPA/Gatekeeper, validates the resource which is included in the admission request based on the profile and sends the verification result to OPA/Gatekeeper.
 Integrity shield server uses [k8s-manifest-sigstore](https://github.com/sigstore/k8s-manifest-sigstore) internally to verify k8s manifest.
 
 You can enable the protection by integrity shield with a few simple steps.
@@ -43,9 +43,10 @@ spec:
       fields:
       - spec.replicas
 ```
-`ManifestIntegrityConstraint` resource includes the parameters field. In the parameters field, you can configure the profile for verifying resource such as ignoreFields for allowing some requests that match this rule, signers, and so on.
+`ManifestIntegrityConstraint` resource includes the parameters field. In the parameters field, you can configure the profile for verifying resources such as ignoreFields for allowing some requests that match this rule, signers, and so on.
 
 ## admission controller
 This is an admission controller for verifying k8s manifest with sigstore signing. You can use this admission controller instead of OPA/Gatekeeper.
 In this case, you can decide which resources to be protected in the custom resource called `ManifestIntegrityProfile`.
-You can setup the admission controller with a few simple steps. Please see [admission controller](./admission-controller/README.md).
+You can set up the admission controller with a few simple steps. Please see [admission controller](./admission-controller/README.md).
+
