@@ -9,15 +9,19 @@ You can set up the admission controller just by the following commands.
 Please specify an image which you can push there and which can be pulled from the cluster as <YOUR_IMAGE_NAME>.
 
 ```
+# Move to admission-controller directory
+$ pwd 
+/integrity-shield/admission-controller
+
 # Build & push an image of admission controller into a registry
-admission-controller$ make build IMG=<YOUR_IMAGE_NAME>
+$ make build IMG=<YOUR_IMAGE_NAME>
 
 # Deploy an admission controller
-admission-controller$ make deploy IMG=<YOUR_IMAGE_NAME>
+$ make deploy IMG=<YOUR_IMAGE_NAME>
 
 # Deploy configmaps for the admission controller
-admission-controller$ kubectl create -f resource/admission-controller-config.yaml
-admission-controller$ kubectl create -f ../integrity-shield-server/resource/request-handler-config.yaml
+$ kubectl create -f resource/admission-controller-config.yaml
+$ kubectl create -f ../integrity-shield-server/resource/request-handler-config.yaml
 ```
 After successful installation, you will see the following resources.
 ```
@@ -75,10 +79,10 @@ spec:
 ```
 ```
 # Deploy CustomResourceDefinition of the profile
-admission-controller$ kubectl create -f resource/manifest_integrity_profile_crd.yaml
+$ kubectl create -f resource/manifest_integrity_profile_crd.yaml
 
 # Deploy ManifestIntegrityProfile
-admission-controller$ kubectl create -f resource/example/profile-configmap.yaml
+$ kubectl create -f resource/example/profile-configmap.yaml
 ```
 
 First, creating a ConfigMap in a target namespace without signature will be blocked.

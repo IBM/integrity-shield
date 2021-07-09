@@ -54,7 +54,7 @@ The following snippet is an example of `ManifestIntegrityProfile`.
 apiVersion: apis.integrityshield.io/v1alpha1
 kind: ManifestIntegrityProfile
 metadata:
-  name: constraint-configmap
+  name: profile-configmap
 spec:
   match:
     kinds:

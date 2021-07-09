@@ -7,30 +7,34 @@ $ kubectl apply -f https://raw.githubusercontent.com/open-policy-agent/gatekeepe
 ```
 
 ### Setup
-You can setup integrity shield server just by the following commands.
+You can set up integrity shield server just by the following commands.
 
 Please specify an image which you can push there and which can be pulled from the cluster as <YOUR_IMAGE_NAME>.
 
 ```
-# Generate certs and put the certs on the secret.yaml 
-integrity-shield-server$ make gencerts
+# Move to integrity-shield-server directory
+$ pwd 
+/integrity-shield/integrity-shield-server
+
+# Generate certs and put the certs on the ./deploy/secret.yaml 
+$ make gencerts
 
 # Create namespace
-integrity-shield-server$ kubectl create ns k8s-manifest-sigstore
+$ kubectl create ns k8s-manifest-sigstore
 
 # Build & push an image of the integrity shield server into a registry
-integrity-shield-server$ make build IMG=<YOUR_IMAGE_NAME>
+$ make build IMG=<YOUR_IMAGE_NAME>
 
 # Deploy the integrity shield server
-integrity-shield-server$ make deploy IMG=<YOUR_IMAGE_NAME>
+$ make deploy IMG=<YOUR_IMAGE_NAME>
 
 # Deploy a configmap for the integrity shield server
-integrity-shield-server$ kubectl create -f resource/request-handler-config.yaml
+$ kubectl create -f resource/request-handler-config.yaml
 ```
 
 After successful installation, you will see the following resources.
 ```
-integrity-shield-server$ kubectl get all -n k8s-manifest-sigstore
+$ kubectl get all -n k8s-manifest-sigstore
 NAME                               READY   STATUS    RESTARTS   AGE
 pod/ishield-api-5b8fd4cbc6-zwtpz   1/1     Running   0          25s
 
@@ -50,10 +54,10 @@ To enable to check requests by integrity shield, `ConstraintTemplate` and the co
 
 ```
 # Deploy the ConstraintTemplate
-integrity-shield-server$ kubectl create -f ../gatekeeper-constraint/template-manifestintegrityconstraint.yaml
+$ kubectl create -f ../gatekeeper-constraint/template-manifestintegrityconstraint.yaml
 
 # Deploy the ManifestIntegrityConstraint
-integrity-shield-server$ kubectl create -f ../gatekeeper-constraint/example/constraint-configmap.yaml
+$ kubectl create -f ../gatekeeper-constraint/example/constraint-configmap.yaml
 ```
 In this example, we use the following constraint. This constraint enforces to protect sample-cm configmap in sample-ns.
 ```
