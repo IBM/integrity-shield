@@ -91,7 +91,12 @@ func RequestHandlerController(remote bool, req admission.Request, paramObj *k8sm
 				Message: "error but allow for development",
 			}
 		}
-		log.Debug("Response from remote request handler ", r)
+		log.WithFields(log.Fields{
+			"namespace": req.Namespace,
+			"name":      req.Name,
+			"kind":      req.Kind.Kind,
+			"operation": req.Operation,
+		}).Debug("Response from remote request handler ", r)
 		return r
 	} else {
 		// local request handler
@@ -125,7 +130,7 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 	}
 
 	// setup log
-	logger := k8smnfconfig.NewLogger(rhconfig.Log.Level, req)
+	logger := k8smnfconfig.SetupLogger(rhconfig.Log, req)
 
 	commonSkipUserMatched := false
 	skipObjectMatched := false
@@ -184,7 +189,12 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 		vo := setVerifyOption(&paramObj.VerifyOption, rhconfig)
 		// call VerifyResource with resource, verifyOption, keypath, imageRef
 		result, err := k8smanifest.VerifyResource(resource, imageRef, keyPath, vo)
-		logger.Debug("VerifyResource: ", result)
+		logger.WithFields(log.Fields{
+			"namespace": req.Namespace,
+			"name":      req.Name,
+			"kind":      req.Kind.Kind,
+			"operation": req.Operation,
+		}).Debug("VerifyResource: ", result)
 		if err != nil {
 			logger.Errorf("failed to check a requested resource; %s", err.Error())
 			return &ResultFromRequestHandler{
@@ -219,7 +229,13 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 
 	// log
 	// logMsg := fmt.Sprintf("%s %s %s : %s %s", req.Kind.Kind, req.Name, req.Operation, strconv.FormatBool(r.Allow), r.Message)
-	logger.Debug("RequestHandler: ", r)
+	logger.WithFields(log.Fields{
+		"namespace": req.Namespace,
+		"name":      req.Name,
+		"kind":      req.Kind.Kind,
+		"operation": req.Operation,
+		"allow":     r.Allow,
+	}).Info(r.Message)
 
 	return r
 }
@@ -227,6 +243,7 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 type ResultFromRequestHandler struct {
 	Allow   bool   `json:"allow"`
 	Message string `json:"message"`
+	Profile string `json:"profile"`
 }
 
 func isUpdateRequest(operation v1.Operation) bool {
@@ -295,7 +312,6 @@ func setVerifyOption(vo *k8smanifest.VerifyOption, config *k8smnfconfig.RequestH
 	fields = append(fields, vo.IgnoreFields...)
 	fields = append(fields, config.RequestFilterProfile.IgnoreFields...)
 	vo.IgnoreFields = fields
-	// log.Info("[DEBUG] setVerifyOption: ", vo)
 	return vo
 }
 
@@ -336,7 +352,6 @@ func loadRequestHandlerConfig() (*k8smnfconfig.RequestHandlerConfig, error) {
 	if err != nil {
 		return sc, errors.Wrap(err, fmt.Sprintf("failed to unmarshal config.yaml into %T", sc))
 	}
-	// log.Info("[DEBUG] HandlerConfig: ", sc)
 	return sc, nil
 }
 

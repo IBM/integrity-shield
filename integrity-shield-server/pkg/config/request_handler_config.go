@@ -20,8 +20,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sigstore/k8s-manifest-sigstore/pkg/k8smanifest"
@@ -41,7 +43,9 @@ type RequestHandlerConfig struct {
 }
 
 type LogConfig struct {
-	Level string `json:"level,omitempty"`
+	Level    string `json:"level,omitempty"`
+	FileDest string `json:"fileDest,omitempty"`
+	Format   string `json:"format,omitempty"`
 }
 
 type ImageVerificationConfig struct {
@@ -56,32 +60,41 @@ type RequestFilterProfile struct {
 	IgnoreFields k8smanifest.ObjectFieldBindingList `json:"ignoreFields,omitempty"`
 }
 
-func NewLogger(level string, req admission.Request) *log.Logger {
+func SetupLogger(config LogConfig, req admission.Request) *log.Logger {
+
 	logger := log.New()
-	logger.SetFormatter(&log.JSONFormatter{})
-	// set field
-	logger.WithFields(log.Fields{
-		"namespace": req.Namespace,
-		"name":      req.Name,
-		"kind":      req.Kind.Kind,
-		"operation": req.Operation,
-	})
-	// set level
-	if level == "Trace" {
+	// format
+	if config.Format == "json" {
+		logger.SetFormatter(&log.JSONFormatter{TimestampFormat: time.RFC3339Nano})
+	}
+	// level
+	if config.Level == "Trace" {
 		logger.SetLevel(log.TraceLevel)
 	}
-	if level == "Info" {
+	if config.Level == "Info" {
 		logger.SetLevel(log.InfoLevel)
 	}
-	if level == "Debug" {
+	if config.Level == "Debug" {
 		logger.SetLevel(log.DebugLevel)
 	}
-	if level == "Warn" {
+	if config.Level == "Warn" {
 		logger.SetLevel(log.WarnLevel)
 	}
-	if level == "Error" {
+	if config.Level == "Error" {
 		logger.SetLevel(log.ErrorLevel)
 	}
+	// output
+	if config.FileDest != "" {
+		file, err := os.OpenFile(config.FileDest, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0640) // NOSONAR
+		if err == nil {
+			logger.Out = file
+		} else {
+			logger.Info("Failed to log to file, using default stderr")
+		}
+	} else {
+		logger.Out = os.Stdout
+	}
+
 	return logger
 }
 

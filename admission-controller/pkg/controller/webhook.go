@@ -23,6 +23,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	miprofile "github.com/IBM/integrity-shield/admission-controller/pkg/apis/manifestintegrityprofile/v1alpha1"
 	mipclient "github.com/IBM/integrity-shield/admission-controller/pkg/client/manifestintegrityprofile/clientset/versioned/typed/manifestintegrityprofile/v1alpha1"
@@ -45,18 +46,37 @@ const defaultConfigKeyInConfigMap = "config.yaml"
 const defaultPodNamespace = "k8s-manifest-sigstore"
 const defaultControllerConfigName = "admission-controller-config"
 
+var logger = log.New()
+
 type AccumulatedResult struct {
 	Allow   bool
 	Message string
+}
+
+func init() {
+	if os.Getenv("LOG_FORMAT") == "json" {
+		logger.SetFormatter(&log.JSONFormatter{TimestampFormat: time.RFC3339Nano})
+	}
+	if os.Getenv("LOG_LEVEL") == "Info" {
+		logger.SetLevel(log.InfoLevel)
+	}
+	if os.Getenv("LOG_LEVEL") == "Debug" {
+		logger.SetLevel(log.DebugLevel)
+	}
+	if os.Getenv("LOG_LEVEL") == "Warn" {
+		logger.SetLevel(log.WarnLevel)
+	}
+
 }
 
 func ProcessRequest(req admission.Request) admission.Response {
 	// load ac2 config
 	config, err := loadShieldConfig()
 	if err != nil {
-		log.Errorf("failed to load shield config; %s", err.Error())
+		logger.Errorf("failed to load shield config; %s", err.Error())
 		return admission.Allowed("error but allow for development")
 	}
+
 	// isScope check
 	inScopeNamespace := config.InScopeNamespaceSelector.Match(req.Namespace)
 	if !inScopeNamespace {
@@ -71,7 +91,7 @@ func ProcessRequest(req admission.Request) admission.Response {
 	// load constraints
 	constraints, err := LoadConstraints()
 	if err != nil {
-		log.Errorf("failed to load constratints; %s", err.Error())
+		logger.Errorf("failed to load constratints; %s", err.Error())
 		return admission.Allowed("error but allow for development")
 	}
 
@@ -80,24 +100,26 @@ func ProcessRequest(req admission.Request) admission.Response {
 	for _, constraint := range constraints {
 
 		//match check: kind, namespace, label
-		isMatched := matchCheck(req, constraint.Match)
+		isMatched := matchCheck(req, constraint.Spec.Match)
 		if !isMatched {
 			r := shield.ResultFromRequestHandler{
 				Allow:   true,
 				Message: "not protected",
+				Profile: constraint.Name,
 			}
 			results = append(results, r)
 			continue
 		}
 
 		// pick parameters from constaint
-		paramObj := GetParametersFromConstraint(constraint)
+		paramObj := GetParametersFromConstraint(constraint.Spec)
 
 		// call request handler & receive result from request handler (allow, message)
 		useRemote, _ := strconv.ParseBool(os.Getenv("USE_REMOTE_HANDLER"))
 		r := shield.RequestHandlerController(useRemote, req, paramObj)
 		// r := handler.RequestHandler(req, paramObj)
 
+		r.Profile = constraint.Name
 		results = append(results, *r)
 	}
 
@@ -110,7 +132,7 @@ func ProcessRequest(req admission.Request) admission.Response {
 
 	// return admission response
 	logMsg := fmt.Sprintf("%s %s %s : %s %s", req.Kind.Kind, req.Name, req.Operation, strconv.FormatBool(ar.Allow), ar.Message)
-	log.Info("AC2 result: ", logMsg)
+	logger.Info("Validate Result: ", logMsg)
 	if ar.Allow {
 		return admission.Allowed(ar.Message)
 	} else {
@@ -142,7 +164,7 @@ func loadShieldConfig() (*acconfig.ShieldConfig, error) {
 	}
 	clientset, err := kubeclient.NewForConfig(config)
 	if err != nil {
-		log.Error(err)
+		logger.Error(err)
 		return nil, nil
 	}
 	cm, err := clientset.CoreV1().ConfigMaps(namespace).Get(context.Background(), configName, metav1.GetOptions{})
@@ -162,26 +184,26 @@ func loadShieldConfig() (*acconfig.ShieldConfig, error) {
 	return sc, nil
 }
 
-func LoadConstraints() ([]miprofile.ManifestIntegrityProfileSpec, error) {
+func LoadConstraints() ([]miprofile.ManifestIntegrityProfile, error) {
 	config, err := kubeutil.GetKubeConfig()
 	if err != nil {
 		return nil, nil
 	}
 	clientset, err := mipclient.NewForConfig(config)
 	if err != nil {
-		log.Error(err)
+		logger.Error(err)
 		return nil, nil
 	}
 	miplist, err := clientset.ManifestIntegrityProfiles().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
-		log.Error("failed to get ManifestIntegrityProfiles:", err.Error())
+		logger.Error("failed to get ManifestIntegrityProfiles:", err.Error())
 		return nil, nil
 	}
-	var constraints []miprofile.ManifestIntegrityProfileSpec
-	for _, mip := range miplist.Items {
-		constraints = append(constraints, mip.Spec)
-	}
-	return constraints, nil
+	// var constraints []miprofile.ManifestIntegrityProfileSpec
+	// for _, mip := range miplist.Items {
+	// 	constraints = append(constraints, mip.Spec)
+	// }
+	return miplist.Items, nil
 }
 
 func matchCheck(req admission.Request, match miprofile.MatchCondition) bool {
@@ -219,17 +241,17 @@ func checkNamespaceLabelMatch(namespace string, labelSelector *metav1.LabelSelec
 	}
 	clientset, err := kubeclient.NewForConfig(config)
 	if err != nil {
-		log.Error(err)
+		logger.Error(err)
 		return false
 	}
 	ns, err := clientset.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
 	if err != nil {
-		log.Errorf("failed to get a namespace `%s`:`%s`", namespace, err.Error())
+		logger.Errorf("failed to get a namespace `%s`:`%s`", namespace, err.Error())
 		return false
 	}
 	selector, err := metav1.LabelSelectorAsSelector(labelSelector)
 	if err != nil {
-		log.Errorf("failed to convert the LabelSelector api type into a struct that implements labels.Selector; %s", err.Error())
+		logger.Errorf("failed to convert the LabelSelector api type into a struct that implements labels.Selector; %s", err.Error())
 		return false
 	}
 	labelsMap := ns.GetLabels()
@@ -246,12 +268,12 @@ func checkLabelMatch(req admission.Request, labelSelector *metav1.LabelSelector)
 	objectBytes := req.AdmissionRequest.Object.Raw
 	err := json.Unmarshal(objectBytes, &resource)
 	if err != nil {
-		log.Errorf("failed to Unmarshal a requested object into %T; %s", resource, err.Error())
+		logger.Errorf("failed to Unmarshal a requested object into %T; %s", resource, err.Error())
 		return false
 	}
 	selector, err := metav1.LabelSelectorAsSelector(labelSelector)
 	if err != nil {
-		log.Errorf("failed to convert the LabelSelector api type into a struct that implements labels.Selector; %s", err.Error())
+		logger.Errorf("failed to convert the LabelSelector api type into a struct that implements labels.Selector; %s", err.Error())
 		return false
 	}
 	labelsMap := resource.GetLabels()
@@ -318,10 +340,11 @@ func getAccumulatedResult(results []shield.ResultFromRequestHandler) *Accumulate
 	accumulatedRes := &AccumulatedResult{}
 	for _, result := range results {
 		if !result.Allow {
-			accumulatedRes.Message = result.Message
-			denyMessages = append(denyMessages, result.Message)
+			msg := "[" + result.Profile + "]" + result.Message
+			denyMessages = append(denyMessages, msg)
 		} else {
-			allowMessages = append(allowMessages, result.Message)
+			msg := "[" + result.Profile + "]" + result.Message
+			allowMessages = append(allowMessages, msg)
 		}
 	}
 	if len(denyMessages) != 0 {
