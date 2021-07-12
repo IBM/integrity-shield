@@ -126,13 +126,27 @@ func ProcessRequest(req admission.Request) admission.Response {
 	// accumulate results from constraints
 	ar := getAccumulatedResult(results)
 
+	// mode check
+	isDetectMode := acconfig.CheckIfDetectOnly(config.Mode)
+	if !ar.Allow && isDetectMode {
+		ar.Allow = true
+		msg := "allowed by detection mode: " + ar.Message
+		ar.Message = msg
+	}
+
 	// TODO: generate events
 
 	// TODO: update status
 
 	// return admission response
-	logMsg := fmt.Sprintf("%s %s %s : %s %s", req.Kind.Kind, req.Name, req.Operation, strconv.FormatBool(ar.Allow), ar.Message)
-	logger.Info("Validate Result: ", logMsg)
+
+	logger.WithFields(log.Fields{
+		"namespace": req.Namespace,
+		"name":      req.Name,
+		"kind":      req.Kind.Kind,
+		"operation": req.Operation,
+		"allow":     ar.Allow,
+	}).Info(ar.Message)
 	if ar.Allow {
 		return admission.Allowed(ar.Message)
 	} else {
