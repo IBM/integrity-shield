@@ -243,7 +243,7 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 type ResultFromRequestHandler struct {
 	Allow   bool   `json:"allow"`
 	Message string `json:"message"`
-	Profile string `json:"profile"`
+	Profile string `json:"profile,omitempty"`
 }
 
 func isUpdateRequest(operation v1.Operation) bool {
