@@ -24,14 +24,19 @@ import (
 )
 
 type ParameterObject struct {
-	k8smanifest.VerifyOption `json:""`
-	InScopeObjects           k8smanifest.ObjectReferenceList `json:"inScopeObjects,omitempty"`
-	SkipUsers                ObjectUserBindingList           `json:"skipUsers,omitempty"`
-	KeySecertName            string                          `json:"keySecretName,omitempty"`
-	KeySecertNamespace       string                          `json:"keySecretNamespace,omitempty"`
-	ImageRef                 string                          `json:"imageRef,omitempty"`
-	TargetServiceAccount     []string                        `json:"targetServiceAccount,omitempty"`
-	ImageProfile             ImageProfile                    `json:"imageProfile,omitempty"`
+	IgnoreFields         k8smanifest.ObjectFieldBindingList `json:"ignoreFields,omitempty"`
+	Signers              k8smanifest.SignerList             `json:"signers,omitempty"`
+	InScopeObjects       k8smanifest.ObjectReferenceList    `json:"inScopeObjects,omitempty"`
+	SkipUsers            ObjectUserBindingList              `json:"skipUsers,omitempty"`
+	KeyConfigs           []KeyConfig                        `json:"keyConfigs,omitempty"`
+	ImageRef             string                             `json:"imageRef,omitempty"`
+	TargetServiceAccount []string                           `json:"targetServiceAccount,omitempty"`
+	ImageProfile         ImageProfile                       `json:"imageProfile,omitempty"`
+}
+
+type KeyConfig struct {
+	KeySecertName      string `json:"keySecretName,omitempty"`
+	KeySecertNamespace string `json:"keySecretNamespace,omitempty"`
 }
 
 type ObjectUserBindingList []ObjectUserBinding

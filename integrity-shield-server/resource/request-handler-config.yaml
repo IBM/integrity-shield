@@ -23,6 +23,13 @@ data:
         - metadata.annotations.control-plane.alpha.kubernetes.io/leader
         - metadata.annotations.kubectl.kubernetes.io/last-applied-configuration
         - metadata.finalizers*
+        - metadata.annotations.namespace
+        - "metadata.annotations.kubectl.\"kubernetes.io/last-applied-configuration\""
+        - "metadata.annotations.deprecated.daemonset.template.generation"
+        - "metadata.creationTimestamp"
+        - "metadata.uid"
+        - "metadata.generation"
+        - "status"
         objects:
         - name: '*'
       - fields:

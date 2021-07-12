@@ -25,6 +25,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -174,16 +175,10 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 		allow = true
 		message = "this resource is not in scope of verification"
 	} else {
-		// get verifyOption and imageRef from Parameter
-		imageRef := paramObj.ImageRef
-		// prepare local key for verifyResource
-		keyPath := ""
-		if paramObj.KeySecertName != "" {
-			keyPath, _ = k8smnfconfig.LoadKeySecret(paramObj.KeySecertNamespace, paramObj.KeySecertName)
-		}
-		vo := setVerifyOption(&paramObj.VerifyOption, rhconfig)
+		vo := setVerifyOption(paramObj, rhconfig)
+		logger.Debug("VerifyOption: ", vo)
 		// call VerifyResource with resource, verifyOption, keypath, imageRef
-		result, err := k8smanifest.VerifyResource(resource, imageRef, keyPath, vo)
+		result, err := k8smanifest.VerifyResource(resource, vo)
 		logger.Debug("VerifyResource: ", result)
 		if err != nil {
 			logger.Errorf("failed to check a requested resource; %s", err.Error())
@@ -201,8 +196,7 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 				message = "no signature found"
 				if result.Diff != nil && result.Diff.Size() > 0 {
 					message = fmt.Sprintf("diff found: %s", result.Diff.String())
-				}
-				if result.Signer != "" {
+				} else if result.Signer != "" {
 					message = fmt.Sprintf("signer config not matched, this is signed by %s", result.Signer)
 				}
 			}
@@ -287,7 +281,28 @@ func mutationCheck(rawOldObject, rawObject []byte, IgnoreFields []string) (bool,
 	return true, nil
 }
 
-func setVerifyOption(vo *k8smanifest.VerifyOption, config *k8smnfconfig.RequestHandlerConfig) *k8smanifest.VerifyOption {
+func setVerifyOption(paramObj *k8smnfconfig.ParameterObject, config *k8smnfconfig.RequestHandlerConfig) *k8smanifest.VerifyResourceOption {
+	vo := &k8smanifest.VerifyResourceOption{}
+	// get verifyOption and imageRef from Parameter
+	vo.CheckDryRunForApply = true
+	vo.IgnoreFields = paramObj.IgnoreFields
+	vo.Signers = paramObj.Signers
+	vo.ImageRef = paramObj.ImageRef
+	// prepare local key for verifyResource
+	if len(paramObj.KeyConfigs) != 0 {
+		keyPathList := []string{}
+		for _, keyconfig := range paramObj.KeyConfigs {
+			if keyconfig.KeySecertName != "" {
+				keyPath, _ := k8smnfconfig.LoadKeySecret(keyconfig.KeySecertNamespace, keyconfig.KeySecertName)
+				keyPathList = append(keyPathList, keyPath)
+			}
+		}
+		keyPathString := strings.Join(keyPathList, ",")
+		if keyPathString != "" {
+			vo.KeyPath = keyPathString
+		}
+	}
+	// merge params in request handler config
 	if config == nil {
 		return vo
 	}
@@ -295,7 +310,6 @@ func setVerifyOption(vo *k8smanifest.VerifyOption, config *k8smnfconfig.RequestH
 	fields = append(fields, vo.IgnoreFields...)
 	fields = append(fields, config.RequestFilterProfile.IgnoreFields...)
 	vo.IgnoreFields = fields
-	// log.Info("[DEBUG] setVerifyOption: ", vo)
 	return vo
 }
 
@@ -336,7 +350,6 @@ func loadRequestHandlerConfig() (*k8smnfconfig.RequestHandlerConfig, error) {
 	if err != nil {
 		return sc, errors.Wrap(err, fmt.Sprintf("failed to unmarshal config.yaml into %T", sc))
 	}
-	// log.Info("[DEBUG] HandlerConfig: ", sc)
 	return sc, nil
 }
 
