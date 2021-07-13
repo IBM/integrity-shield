@@ -185,9 +185,9 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 		message = "verification of this resource is skipped"
 	} else {
 		vo := setVerifyOption(paramObj, rhconfig)
-		logger.Debug("VerifyOption: ", vo)
+		log.Debug("VerifyOption: ", vo)
 		// call VerifyResource with resource, verifyOption, keypath, imageRef
-		result, err := k8smanifest.VerifyResource(resource, imageRef, keyPath, vo)
+		result, err := k8smanifest.VerifyResource(resource, vo)
 		log.WithFields(log.Fields{
 			"namespace": req.Namespace,
 			"name":      req.Name,
