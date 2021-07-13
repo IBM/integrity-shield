@@ -46,7 +46,6 @@ const defaultConfigKeyInConfigMap = "config.yaml"
 const defaultPodNamespace = "k8s-manifest-sigstore"
 const defaultControllerConfigName = "admission-controller-config"
 const logLevelEnvKey = "LOG_LEVEL"
-const k8sLogLevelEnvKey = "K8S_MANIFEST_SIGSTORE_LOG_LEVEL"
 
 var logLevelMap = map[string]log.Level{
 	"panic": log.PanicLevel,
@@ -68,18 +67,9 @@ func init() {
 		log.SetFormatter(&log.JSONFormatter{TimestampFormat: time.RFC3339Nano})
 	}
 	logLevelStr := os.Getenv(logLevelEnvKey)
-	k8sLogLevelStr := os.Getenv(k8sLogLevelEnvKey)
-	if logLevelStr == "" && k8sLogLevelStr == "" {
+	if logLevelStr == "" {
 		logLevelStr = "info"
-		os.Setenv(k8sLogLevelEnvKey, "info")
 	}
-	if logLevelStr == "" && k8sLogLevelStr != "" {
-		logLevelStr = k8sLogLevelStr
-	}
-	if logLevelStr != "" && k8sLogLevelStr == "" {
-		os.Setenv(k8sLogLevelEnvKey, logLevelStr)
-	}
-
 	logLevel, ok := logLevelMap[logLevelStr]
 	if !ok {
 		logLevel = log.InfoLevel
