@@ -282,11 +282,9 @@ func mutationCheck(rawOldObject, rawObject []byte, IgnoreFields []string) (bool,
 }
 
 func setVerifyOption(paramObj *k8smnfconfig.ParameterObject, config *k8smnfconfig.RequestHandlerConfig) *k8smanifest.VerifyResourceOption {
-	vo := &k8smanifest.VerifyResourceOption{}
 	// get verifyOption and imageRef from Parameter
+	vo := &paramObj.VerifyResourceOption
 	vo.CheckDryRunForApply = true
-	vo.IgnoreFields = paramObj.IgnoreFields
-	vo.Signers = paramObj.Signers
 	vo.ImageRef = paramObj.ImageRef
 	// prepare local key for verifyResource
 	if len(paramObj.KeyConfigs) != 0 {
@@ -303,7 +301,7 @@ func setVerifyOption(paramObj *k8smnfconfig.ParameterObject, config *k8smnfconfi
 		}
 	}
 	// merge params in request handler config
-	if config == nil {
+	if len(config.RequestFilterProfile.IgnoreFields) == 0 {
 		return vo
 	}
 	fields := k8smanifest.ObjectFieldBindingList{}

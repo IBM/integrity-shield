@@ -24,14 +24,13 @@ import (
 )
 
 type ParameterObject struct {
-	IgnoreFields         k8smanifest.ObjectFieldBindingList `json:"ignoreFields,omitempty"`
-	Signers              k8smanifest.SignerList             `json:"signers,omitempty"`
-	InScopeObjects       k8smanifest.ObjectReferenceList    `json:"inScopeObjects,omitempty"`
-	SkipUsers            ObjectUserBindingList              `json:"skipUsers,omitempty"`
-	KeyConfigs           []KeyConfig                        `json:"keyConfigs,omitempty"`
-	ImageRef             string                             `json:"imageRef,omitempty"`
-	TargetServiceAccount []string                           `json:"targetServiceAccount,omitempty"`
-	ImageProfile         ImageProfile                       `json:"imageProfile,omitempty"`
+	k8smanifest.VerifyResourceOption `json:""`
+	KeyConfigs                       []KeyConfig                     `json:"keyConfigs,omitempty"`
+	ImageRef                         string                          `json:"imageRef,omitempty"`
+	InScopeObjects                   k8smanifest.ObjectReferenceList `json:"inScopeObjects,omitempty"`
+	SkipUsers                        ObjectUserBindingList           `json:"skipUsers,omitempty"`
+	TargetServiceAccount             []string                        `json:"targetServiceAccount,omitempty"`
+	ImageProfile                     ImageProfile                    `json:"imageProfile,omitempty"`
 }
 
 type KeyConfig struct {
