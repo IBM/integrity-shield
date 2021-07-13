@@ -41,6 +41,8 @@ spec:
           value: "info"
         - name: LOG_FORMAT
           value: "json"
+        - name: K8S_MANIFEST_SIGSTORE_LOG_LEVEL
+          value: "info"
         ports:
         - containerPort: 9443
           name: validator-port

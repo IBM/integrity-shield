@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -31,6 +32,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
+
+const k8sLogLevelEnvKey = "K8S_MANIFEST_SIGSTORE_LOG_LEVEL"
 
 var logLevelMap = map[string]log.Level{
 	"panic": log.PanicLevel,
@@ -52,9 +55,9 @@ type RequestHandlerConfig struct {
 }
 
 type LogConfig struct {
-	Level    string `json:"level,omitempty"`
-	FileDest string `json:"fileDest,omitempty"`
-	Format   string `json:"format,omitempty"`
+	Level                    string `json:"level,omitempty"`
+	ManifestSigstoreLogLevel string `json:"manifestSigstoreLogLevel,omitempty"`
+	Format                   string `json:"format,omitempty"`
 }
 
 type ImageVerificationConfig struct {
@@ -71,8 +74,16 @@ type RequestFilterProfile struct {
 
 func SetupLogger(config LogConfig, req admission.Request) {
 	logLevelStr := config.Level
-	if logLevelStr == "" {
+	k8sLogLevelStr := config.ManifestSigstoreLogLevel
+	if logLevelStr == "" && k8sLogLevelStr == "" {
 		logLevelStr = "info"
+		os.Setenv(k8sLogLevelEnvKey, "info")
+	}
+	if logLevelStr == "" && k8sLogLevelStr != "" {
+		logLevelStr = k8sLogLevelStr
+	}
+	if logLevelStr != "" && k8sLogLevelStr == "" {
+		os.Setenv(k8sLogLevelEnvKey, logLevelStr)
 	}
 	logLevel, ok := logLevelMap[logLevelStr]
 	if !ok {
