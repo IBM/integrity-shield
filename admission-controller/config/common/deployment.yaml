@@ -38,7 +38,7 @@ spec:
         - name: REQUEST_HANDLER_CONFIG_NAME
           value: "request-handler-config"
         - name: LOG_LEVEL
-          value: "Info"
+          value: "info"
         - name: LOG_FORMAT
           value: "json"
         ports:
