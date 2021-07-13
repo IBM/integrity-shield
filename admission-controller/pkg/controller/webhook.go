@@ -45,8 +45,17 @@ import (
 const defaultConfigKeyInConfigMap = "config.yaml"
 const defaultPodNamespace = "k8s-manifest-sigstore"
 const defaultControllerConfigName = "admission-controller-config"
+const logLevelEnvKey = "LOG_LEVEL"
 
-var logger = log.New()
+var logLevelMap = map[string]log.Level{
+	"panic": log.PanicLevel,
+	"fatal": log.FatalLevel,
+	"error": log.ErrorLevel,
+	"warn":  log.WarnLevel,
+	"info":  log.InfoLevel,
+	"debug": log.DebugLevel,
+	"trace": log.TraceLevel,
+}
 
 type AccumulatedResult struct {
 	Allow   bool
@@ -55,25 +64,25 @@ type AccumulatedResult struct {
 
 func init() {
 	if os.Getenv("LOG_FORMAT") == "json" {
-		logger.SetFormatter(&log.JSONFormatter{TimestampFormat: time.RFC3339Nano})
+		log.SetFormatter(&log.JSONFormatter{TimestampFormat: time.RFC3339Nano})
 	}
-	if os.Getenv("LOG_LEVEL") == "Info" {
-		logger.SetLevel(log.InfoLevel)
+	logLevelStr := os.Getenv(logLevelEnvKey)
+	if logLevelStr == "" {
+		logLevelStr = "info"
 	}
-	if os.Getenv("LOG_LEVEL") == "Debug" {
-		logger.SetLevel(log.DebugLevel)
-	}
-	if os.Getenv("LOG_LEVEL") == "Warn" {
-		logger.SetLevel(log.WarnLevel)
+	logLevel, ok := logLevelMap[logLevelStr]
+	if !ok {
+		logLevel = log.InfoLevel
 	}
 
+	log.SetLevel(logLevel)
 }
 
 func ProcessRequest(req admission.Request) admission.Response {
 	// load ac2 config
 	config, err := loadShieldConfig()
 	if err != nil {
-		logger.Errorf("failed to load shield config; %s", err.Error())
+		log.Errorf("failed to load shield config; %s", err.Error())
 		return admission.Allowed("error but allow for development")
 	}
 
@@ -91,7 +100,7 @@ func ProcessRequest(req admission.Request) admission.Response {
 	// load constraints
 	constraints, err := LoadConstraints()
 	if err != nil {
-		logger.Errorf("failed to load constratints; %s", err.Error())
+		log.Errorf("failed to load constratints; %s", err.Error())
 		return admission.Allowed("error but allow for development")
 	}
 
@@ -140,7 +149,7 @@ func ProcessRequest(req admission.Request) admission.Response {
 
 	// return admission response
 
-	logger.WithFields(log.Fields{
+	log.WithFields(log.Fields{
 		"namespace": req.Namespace,
 		"name":      req.Name,
 		"kind":      req.Kind.Kind,
@@ -178,7 +187,7 @@ func loadShieldConfig() (*acconfig.ShieldConfig, error) {
 	}
 	clientset, err := kubeclient.NewForConfig(config)
 	if err != nil {
-		logger.Error(err)
+		log.Error(err)
 		return nil, nil
 	}
 	cm, err := clientset.CoreV1().ConfigMaps(namespace).Get(context.Background(), configName, metav1.GetOptions{})
@@ -205,12 +214,12 @@ func LoadConstraints() ([]miprofile.ManifestIntegrityProfile, error) {
 	}
 	clientset, err := mipclient.NewForConfig(config)
 	if err != nil {
-		logger.Error(err)
+		log.Error(err)
 		return nil, nil
 	}
 	miplist, err := clientset.ManifestIntegrityProfiles().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
-		logger.Error("failed to get ManifestIntegrityProfiles:", err.Error())
+		log.Error("failed to get ManifestIntegrityProfiles:", err.Error())
 		return nil, nil
 	}
 	// var constraints []miprofile.ManifestIntegrityProfileSpec
@@ -255,17 +264,17 @@ func checkNamespaceLabelMatch(namespace string, labelSelector *metav1.LabelSelec
 	}
 	clientset, err := kubeclient.NewForConfig(config)
 	if err != nil {
-		logger.Error(err)
+		log.Error(err)
 		return false
 	}
 	ns, err := clientset.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
 	if err != nil {
-		logger.Errorf("failed to get a namespace `%s`:`%s`", namespace, err.Error())
+		log.Errorf("failed to get a namespace `%s`:`%s`", namespace, err.Error())
 		return false
 	}
 	selector, err := metav1.LabelSelectorAsSelector(labelSelector)
 	if err != nil {
-		logger.Errorf("failed to convert the LabelSelector api type into a struct that implements labels.Selector; %s", err.Error())
+		log.Errorf("failed to convert the LabelSelector api type into a struct that implements labels.Selector; %s", err.Error())
 		return false
 	}
 	labelsMap := ns.GetLabels()
@@ -282,12 +291,12 @@ func checkLabelMatch(req admission.Request, labelSelector *metav1.LabelSelector)
 	objectBytes := req.AdmissionRequest.Object.Raw
 	err := json.Unmarshal(objectBytes, &resource)
 	if err != nil {
-		logger.Errorf("failed to Unmarshal a requested object into %T; %s", resource, err.Error())
+		log.Errorf("failed to Unmarshal a requested object into %T; %s", resource, err.Error())
 		return false
 	}
 	selector, err := metav1.LabelSelectorAsSelector(labelSelector)
 	if err != nil {
-		logger.Errorf("failed to convert the LabelSelector api type into a struct that implements labels.Selector; %s", err.Error())
+		log.Errorf("failed to convert the LabelSelector api type into a struct that implements labels.Selector; %s", err.Error())
 		return false
 	}
 	labelsMap := resource.GetLabels()

@@ -130,7 +130,7 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 	}
 
 	// setup log
-	logger := k8smnfconfig.SetupLogger(rhconfig.Log, req)
+	k8smnfconfig.SetupLogger(rhconfig.Log, req)
 
 	commonSkipUserMatched := false
 	skipObjectMatched := false
@@ -153,7 +153,7 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 		ignoreFields := getMatchedIgnoreFields(paramObj.IgnoreFields, rhconfig.RequestFilterProfile.IgnoreFields, resource)
 		mutated, err := mutationCheck(req.AdmissionRequest.OldObject.Raw, req.AdmissionRequest.Object.Raw, ignoreFields)
 		if err != nil {
-			logger.Errorf("failed to check mutation", err.Error())
+			log.Errorf("failed to check mutation", err.Error())
 			return &ResultFromRequestHandler{
 				Allow:   true,
 				Message: "error but allow for development",
@@ -189,14 +189,14 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 		vo := setVerifyOption(&paramObj.VerifyOption, rhconfig)
 		// call VerifyResource with resource, verifyOption, keypath, imageRef
 		result, err := k8smanifest.VerifyResource(resource, imageRef, keyPath, vo)
-		logger.WithFields(log.Fields{
+		log.WithFields(log.Fields{
 			"namespace": req.Namespace,
 			"name":      req.Name,
 			"kind":      req.Kind.Kind,
 			"operation": req.Operation,
 		}).Debug("VerifyResource: ", result)
 		if err != nil {
-			logger.Errorf("failed to check a requested resource; %s", err.Error())
+			log.Errorf("failed to check a requested resource; %s", err.Error())
 			return &ResultFromRequestHandler{
 				Allow:   true,
 				Message: "error but allow for development",
@@ -229,7 +229,7 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 
 	// log
 	// logMsg := fmt.Sprintf("%s %s %s : %s %s", req.Kind.Kind, req.Name, req.Operation, strconv.FormatBool(r.Allow), r.Message)
-	logger.WithFields(log.Fields{
+	log.WithFields(log.Fields{
 		"namespace": req.Namespace,
 		"name":      req.Name,
 		"kind":      req.Kind.Kind,

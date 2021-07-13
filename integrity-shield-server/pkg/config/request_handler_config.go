@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -32,6 +31,16 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
+
+var logLevelMap = map[string]log.Level{
+	"panic": log.PanicLevel,
+	"fatal": log.FatalLevel,
+	"error": log.ErrorLevel,
+	"warn":  log.WarnLevel,
+	"info":  log.InfoLevel,
+	"debug": log.DebugLevel,
+	"trace": log.TraceLevel,
+}
 
 type RequestHandlerConfig struct {
 	ImageVerificationConfig ImageVerificationConfig `json:"imageVerificationConfig,omitempty"`
@@ -60,42 +69,21 @@ type RequestFilterProfile struct {
 	IgnoreFields k8smanifest.ObjectFieldBindingList `json:"ignoreFields,omitempty"`
 }
 
-func SetupLogger(config LogConfig, req admission.Request) *log.Logger {
+func SetupLogger(config LogConfig, req admission.Request) {
+	logLevelStr := config.Level
+	if logLevelStr == "" {
+		logLevelStr = "info"
+	}
+	logLevel, ok := logLevelMap[logLevelStr]
+	if !ok {
+		logLevel = log.InfoLevel
+	}
 
-	logger := log.New()
+	log.SetLevel(logLevel)
 	// format
 	if config.Format == "json" {
-		logger.SetFormatter(&log.JSONFormatter{TimestampFormat: time.RFC3339Nano})
+		log.SetFormatter(&log.JSONFormatter{TimestampFormat: time.RFC3339Nano})
 	}
-	// level
-	if config.Level == "Trace" {
-		logger.SetLevel(log.TraceLevel)
-	}
-	if config.Level == "Info" {
-		logger.SetLevel(log.InfoLevel)
-	}
-	if config.Level == "Debug" {
-		logger.SetLevel(log.DebugLevel)
-	}
-	if config.Level == "Warn" {
-		logger.SetLevel(log.WarnLevel)
-	}
-	if config.Level == "Error" {
-		logger.SetLevel(log.ErrorLevel)
-	}
-	// output
-	if config.FileDest != "" {
-		file, err := os.OpenFile(config.FileDest, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0640) // NOSONAR
-		if err == nil {
-			logger.Out = file
-		} else {
-			logger.Info("Failed to log to file, using default stderr")
-		}
-	} else {
-		logger.Out = os.Stdout
-	}
-
-	return logger
 }
 
 func LoadKeySecret(keySecertNamespace, keySecertName string) (string, error) {
