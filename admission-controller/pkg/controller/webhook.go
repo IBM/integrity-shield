@@ -145,7 +145,22 @@ func ProcessRequest(req admission.Request) admission.Response {
 
 	// TODO: generate events
 
-	// TODO: update status
+	// update status
+	for _, res := range results {
+		if !res.Allow {
+			errMsg := res.Message
+			if isDetectMode {
+				errMsg = "[Detection] " + res.Message
+			}
+			UpdateConstraintStatus(res.Profile, req, errMsg)
+			log.WithFields(log.Fields{
+				"namespace": req.Namespace,
+				"name":      req.Name,
+				"kind":      req.Kind.Kind,
+				"operation": req.Operation,
+			}).Debug("updated constraint status:", res.Profile)
+		}
+	}
 
 	// return admission response
 
@@ -222,11 +237,32 @@ func LoadConstraints() ([]miprofile.ManifestIntegrityProfile, error) {
 		log.Error("failed to get ManifestIntegrityProfiles:", err.Error())
 		return nil, nil
 	}
-	// var constraints []miprofile.ManifestIntegrityProfileSpec
-	// for _, mip := range miplist.Items {
-	// 	constraints = append(constraints, mip.Spec)
-	// }
 	return miplist.Items, nil
+}
+
+func UpdateConstraintStatus(constraint string, req admission.Request, errMsg string) error {
+	config, err := kubeutil.GetKubeConfig()
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	clientset, err := mipclient.NewForConfig(config)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	mip, err := clientset.ManifestIntegrityProfiles().Get(context.Background(), constraint, metav1.GetOptions{})
+	if err != nil {
+		log.Error("failed to get ManifestIntegrityProfiles:", err.Error())
+		return err
+	}
+	newMIP := mip.UpdateStatus(req, errMsg)
+	_, err = clientset.ManifestIntegrityProfiles().Update(context.Background(), newMIP, metav1.UpdateOptions{})
+	if err != nil {
+		log.Error("failed to update ManifestIntegrityProfileStatus:", err.Error())
+		return err
+	}
+	return nil
 }
 
 func matchCheck(req admission.Request, match miprofile.MatchCondition) bool {
