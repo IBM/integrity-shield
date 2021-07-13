@@ -118,11 +118,15 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 	// load request handler config
 	rhconfig, err := loadRequestHandlerConfig()
 	if err != nil {
-		log.Errorf("failed to load shield config", err.Error())
+		log.Errorf("failed to load request handler config", err.Error())
 		return &ResultFromRequestHandler{
 			Allow:   true,
 			Message: "error but allow for development",
 		}
+	}
+	if rhconfig == nil {
+		log.Warning("request handler config is empty")
+		rhconfig = &k8smnfconfig.RequestHandlerConfig{}
 	}
 
 	// setup log
@@ -133,8 +137,8 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 	if rhconfig != nil {
 		//filter by user listed in common profile
 		commonSkipUserMatched = rhconfig.RequestFilterProfile.SkipUsers.Match(resource, req.AdmissionRequest.UserInfo.Username)
-		// ignore object
-		skipObjectMatched = rhconfig.RequestFilterProfile.SkipObjects.Match(resource)
+		// skip object
+		skipObjectMatched = skipObjectsMatch(rhconfig.RequestFilterProfile.SkipObjects, resource)
 	}
 
 	// Proccess with parameter
@@ -173,7 +177,7 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 		message = "this resource is not in scope of verification"
 	} else if skipObjectMatched {
 		allow = true
-		message = "this resource is not in scope of verification"
+		message = "verification of this resource is skipped"
 	} else {
 		vo := setVerifyOption(paramObj, rhconfig)
 		logger.Debug("VerifyOption: ", vo)
@@ -349,6 +353,18 @@ func loadRequestHandlerConfig() (*k8smnfconfig.RequestHandlerConfig, error) {
 		return sc, errors.Wrap(err, fmt.Sprintf("failed to unmarshal config.yaml into %T", sc))
 	}
 	return sc, nil
+}
+
+func skipObjectsMatch(l k8smanifest.ObjectReferenceList, obj unstructured.Unstructured) bool {
+	if len(l) == 0 {
+		return false
+	}
+	for _, r := range l {
+		if r.Match(obj) {
+			return true
+		}
+	}
+	return false
 }
 
 type RemoteRequestHandlerInputMap struct {
