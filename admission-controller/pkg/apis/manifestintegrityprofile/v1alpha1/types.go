@@ -27,7 +27,7 @@ import (
 
 var layout = "2006-01-02 15:04:05"
 
-const maxHistoryLength = 3
+const maxHistoryLength = 10
 
 // ManifestIntegrityProfileSpec defines the desired state of AppEnforcePolicy
 type ManifestIntegrityProfileSpec struct {
