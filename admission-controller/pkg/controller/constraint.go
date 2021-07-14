@@ -211,7 +211,7 @@ func updateConstraintStatus(constraint string, req admission.Request, errMsg str
 	return nil
 }
 
-func UpdateConstraints(isDetectMode bool, req admission.Request, results []shield.ResultFromRequestHandler) {
+func updateConstraints(isDetectMode bool, req admission.Request, results []shield.ResultFromRequestHandler) {
 	for _, res := range results {
 		if !res.Allow {
 			errMsg := res.Message
@@ -219,7 +219,7 @@ func UpdateConstraints(isDetectMode bool, req admission.Request, results []shiel
 				errMsg = "[Detection] " + res.Message
 			}
 			// update status
-			updateConstraintStatus(res.Profile, req, errMsg)
+			_ = updateConstraintStatus(res.Profile, req, errMsg)
 
 			log.WithFields(log.Fields{
 				"namespace": req.Namespace,
