@@ -1,7 +1,0 @@
-apiVersion: apis.integrityshield.io/v1alpha1
-kind: IntegrityShield
-metadata:
-  name: integrityshield-sample
-spec:
-  # Add fields here
-  foo: bar

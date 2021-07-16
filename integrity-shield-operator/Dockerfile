@@ -1,27 +1,15 @@
-# Build the manager binary
-FROM golang:1.15 as builder
+FROM registry.access.redhat.com/ubi7/ubi-minimal:7.8
 
-WORKDIR /workspace
-# Copy the Go Modules manifests
-COPY go.mod go.mod
-COPY go.sum go.sum
-# cache deps before building and copying source so that we don't need to re-download as much
-# and so that source changes don't invalidate our downloaded layer
-RUN go mod download
+RUN mkdir /ishield-op-app && \
+    curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o jq-linux64 && \
+    chmod +x jq-linux64 && \
+    mv jq-linux64 /usr/local/bin/jq
 
-# Copy the go source
-COPY main.go main.go
-COPY api/ api/
-COPY controllers/ controllers/
 
-# Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o manager main.go
+COPY build/_output/bin/integrity-shield-operator /ishield-op-app/manager
 
-# Use distroless as minimal base image to package the manager binary
-# Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM gcr.io/distroless/static:nonroot
-WORKDIR /
-COPY --from=builder /workspace/manager .
-USER 65532:65532
+RUN chgrp -R 0 /ishield-op-app && chmod -R g=u /ishield-op-app
 
-ENTRYPOINT ["/manager"]
+WORKDIR /ishield-op-app
+
+ENTRYPOINT ["/ishield-op-app/manager"]

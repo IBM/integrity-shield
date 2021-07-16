@@ -1,23 +1,33 @@
-/*
-Copyright 2021.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+//
+// Copyright 2020 IBM Corporation
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
 
 package v1alpha1
 
 import (
+	admv1 "k8s.io/api/admissionregistration/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	intstr "k8s.io/apimachinery/pkg/util/intstr"
+)
+
+const (
+	DefaultIShieldWebhookTimeout = 10
+	DefaultIShieldAPILabel       = "ishield-api"
+
+	CleanupFinalizerName = "cleanup.finalizers.integrityshield.io"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -28,8 +38,78 @@ type IntegrityShieldSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of IntegrityShield. Edit integrityshield_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	MaxSurge       *intstr.IntOrString `json:"maxSurge,omitempty"`
+	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
+	ReplicaCount   *int32              `json:"replicaCount,omitempty"`
+	MetaLabels     map[string]string   `json:"labels,omitempty"`
+	NodeSelector   map[string]string   `json:"nodeSelector,omitempty"`
+	Affinity       *v1.Affinity        `json:"affinity,omitempty"`
+	Tolerations    []v1.Toleration     `json:"tolerations,omitempty"`
+
+	Security SecurityConfig `json:"security,omitempty"`
+
+	// request handler
+	Server                   ServerContainer `json:"shieldApi,omitempty"`
+	RequestHandlerConfigKey  string          `json:"requestHandlerConfigKey,omitempty"`
+	RequestHandlerConfigName string          `json:"requestHandlerConfigName,omitempty"`
+	RequestHandlerConfig     string          `json:"requestHandlerConfig,omitempty"`
+	ApiServiceName           string          `json:"shieldApiServiceName,omitempty"`
+	ApiServicePort           int32           `json:"shieldApiServicePort,omitempty"`
+
+	// admission controller
+	ControllerContainer           ControllerContainer `json:"admissionController,omitempty"`
+	AdmissionControllerConfigKey  string              `json:"admissionControllerConfigKey,omitempty"`
+	AdmissionControllerConfigName string              `json:"admissionControllerConfigName,omitempty"`
+	AdmissionControllerConfig     string              `json:"admissionControllerConfig,omitempty"`
+
+	ServerTlsSecretName        string     `json:"shieldApiTlsSecretName,omitempty"`
+	WebhookServerTlsSecretName string     `json:"webhookServerTlsSecretName,omitempty"`
+	WebhookServiceName         string     `json:"webhookServiceName,omitempty"`
+	WebhookConfigName          string     `json:"webhookConfigName,omitempty"`
+	WebhookNamespacedResource  admv1.Rule `json:"webhookNamespacedResource,omitempty"`
+	WebhookClusterResource     admv1.Rule `json:"webhookClusterResource,omitempty"`
+
+	// gatekeeper
+	UseGatekeeper bool   `json:"useGatekeeper,omitempty"`
+	Rego          string `json:"rego,omitempty"`
+}
+
+type ServerContainer struct {
+	Name            string                  `json:"name,omitempty"`
+	SelectorLabels  map[string]string       `json:"selector,omitempty"`
+	SecurityContext *v1.SecurityContext     `json:"securityContext,omitempty"`
+	ImagePullPolicy v1.PullPolicy           `json:"imagePullPolicy,omitempty"`
+	Image           string                  `json:"image,omitempty"`
+	Port            int32                   `json:"port,omitempty"`
+	Resources       v1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+type ControllerContainer struct {
+	Name            string                  `json:"name,omitempty"`
+	SelectorLabels  map[string]string       `json:"selector,omitempty"`
+	SecurityContext *v1.SecurityContext     `json:"securityContext,omitempty"`
+	ImagePullPolicy v1.PullPolicy           `json:"imagePullPolicy,omitempty"`
+	Image           string                  `json:"image,omitempty"`
+	Port            int32                   `json:"port,omitempty"`
+	Resources       v1.ResourceRequirements `json:"resources,omitempty"`
+	Log             LogConfig               `json:"log,omitempty"`
+}
+
+type SecurityConfig struct {
+	ServerServiceAccountName string                 `json:"serverServiceAccountName,omitempty"`
+	ACServiceAccountName     string                 `json:"admissionControllerServiceAccountName,omitempty"`
+	ServerRole               string                 `json:"shieldApiRole,omitempty"`
+	ServerRoleBinding        string                 `json:"shieldApiRoleBinding,omitempty"`
+	ACClusterRole            string                 `json:"admissionControllerClusterRole,omitempty"`
+	ACClusterRoleBinding     string                 `json:"admissionControllerClusterRoleBinding,omitempty"`
+	PodSecurityPolicyName    string                 `json:"podSecurityPolicyName,omitempty"`
+	PodSecurityContext       *v1.PodSecurityContext `json:"securityContext,omitempty"`
+	// AutoIShieldAdminCreationDisabled bool                   `json:"autoIShieldAdminRoleCreationDisabled,omitempty"`
+}
+
+type LogConfig struct {
+	LogLevel  string `json:"level,omitempty"`
+	LogFormat string `json:"format,omitempty"`
 }
 
 // IntegrityShieldStatus defines the observed state of IntegrityShield
