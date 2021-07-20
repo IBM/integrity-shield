@@ -180,6 +180,7 @@ func (self *Inspector) Run() {
 		result, err := k8smanifest.VerifyResource(resource, vo)
 		if err != nil {
 			fmt.Println("Failed to verify resource; err: ", err.Error())
+			continue
 		}
 
 		message := ""
