@@ -311,7 +311,10 @@ func setVerifyOption(paramObj *k8smnfconfig.ParameterObject, config *k8smnfconfi
 		keyPathList := []string{}
 		for _, keyconfig := range paramObj.KeyConfigs {
 			if keyconfig.KeySecertName != "" {
-				keyPath, _ := k8smnfconfig.LoadKeySecret(keyconfig.KeySecertNamespace, keyconfig.KeySecertName)
+				keyPath, err := k8smnfconfig.LoadKeySecret(keyconfig.KeySecertNamespace, keyconfig.KeySecertName)
+				if err != nil {
+					log.Errorf("failed to load key secret", err.Error())
+				}
 				keyPathList = append(keyPathList, keyPath)
 			}
 		}
