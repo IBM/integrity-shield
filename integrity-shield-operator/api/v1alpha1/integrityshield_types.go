@@ -62,6 +62,9 @@ type IntegrityShieldSpec struct {
 	AdmissionControllerConfigName string              `json:"admissionControllerConfigName,omitempty"`
 	AdmissionControllerConfig     string              `json:"admissionControllerConfig,omitempty"`
 
+	// observer
+	Observer Observer `json:"observer,omitempty"`
+
 	ServerTlsSecretName        string     `json:"shieldApiTlsSecretName,omitempty"`
 	WebhookServerTlsSecretName string     `json:"webhookServerTlsSecretName,omitempty"`
 	WebhookServiceName         string     `json:"webhookServiceName,omitempty"`
@@ -96,20 +99,36 @@ type ControllerContainer struct {
 }
 
 type SecurityConfig struct {
-	ServerServiceAccountName string                 `json:"serverServiceAccountName,omitempty"`
-	ACServiceAccountName     string                 `json:"admissionControllerServiceAccountName,omitempty"`
-	ServerRole               string                 `json:"shieldApiRole,omitempty"`
-	ServerRoleBinding        string                 `json:"shieldApiRoleBinding,omitempty"`
-	ACClusterRole            string                 `json:"admissionControllerClusterRole,omitempty"`
-	ACClusterRoleBinding     string                 `json:"admissionControllerClusterRoleBinding,omitempty"`
-	PodSecurityPolicyName    string                 `json:"podSecurityPolicyName,omitempty"`
-	PodSecurityContext       *v1.PodSecurityContext `json:"securityContext,omitempty"`
+	ServerServiceAccountName   string                 `json:"serverServiceAccountName,omitempty"`
+	ACServiceAccountName       string                 `json:"admissionControllerServiceAccountName,omitempty"`
+	ObserverServiceAccountName string                 `json:"observerServiceAccountName,omitempty"`
+	ObserverRole               string                 `json:"observerRole,omitempty"`
+	ObserverRoleBinding        string                 `json:"observerRoleBinding,omitempty"`
+	ServerRole                 string                 `json:"shieldApiRole,omitempty"`
+	ServerRoleBinding          string                 `json:"shieldApiRoleBinding,omitempty"`
+	ACClusterRole              string                 `json:"admissionControllerClusterRole,omitempty"`
+	ACClusterRoleBinding       string                 `json:"admissionControllerClusterRoleBinding,omitempty"`
+	PodSecurityPolicyName      string                 `json:"podSecurityPolicyName,omitempty"`
+	PodSecurityContext         *v1.PodSecurityContext `json:"securityContext,omitempty"`
 	// AutoIShieldAdminCreationDisabled bool                   `json:"autoIShieldAdminRoleCreationDisabled,omitempty"`
 }
 
 type LogConfig struct {
 	LogLevel  string `json:"level,omitempty"`
 	LogFormat string `json:"format,omitempty"`
+}
+
+type Observer struct {
+	Name                     string              `json:"name,omitempty"`
+	SelectorLabels           map[string]string   `json:"selector,omitempty"`
+	ImagePullPolicy          v1.PullPolicy       `json:"imagePullPolicy,omitempty"`
+	Image                    string              `json:"image,omitempty"`
+	SecurityContext          *v1.SecurityContext `json:"securityContext,omitempty"`
+	LogLevel                 string              `json:"logLevel,omitempty"`
+	TargetResourceConfigName string              `json:"targetResourceConfigName,omitempty"`
+	TargetResourceConfigKey  string              `json:"targetResourceConfigKey,omitempty"`
+	Interval                 string              `json:"interval,omitempty"`
+	TargetResourceConfig     string              `json:"targetResourceConfig,omitempty"`
 }
 
 // IntegrityShieldStatus defines the observed state of IntegrityShield

@@ -36,6 +36,7 @@ func BuildDeploymentForIShieldServer(cr *apiv1alpha1.IntegrityShield) *appsv1.De
 
 	volumes = []v1.Volume{
 		SecretVolume("ishield-api-certs", cr.Spec.ServerTlsSecretName),
+		EmptyDirVolume("tmp"),
 	}
 
 	servervolumemounts = []v1.VolumeMount{
@@ -43,6 +44,10 @@ func BuildDeploymentForIShieldServer(cr *apiv1alpha1.IntegrityShield) *appsv1.De
 			MountPath: "/run/secrets/tls",
 			Name:      "ishield-api-certs",
 			ReadOnly:  true,
+		},
+		{
+			MountPath: "/tmp",
+			Name:      "tmp",
 		},
 	}
 
@@ -148,6 +153,7 @@ func BuildDeploymentForAdmissionController(cr *apiv1alpha1.IntegrityShield) *app
 
 	volumes = []v1.Volume{
 		SecretVolume("webhook-tls", cr.Spec.WebhookServerTlsSecretName),
+		EmptyDirVolume("tmp"),
 	}
 
 	servervolumemounts = []v1.VolumeMount{
@@ -155,6 +161,10 @@ func BuildDeploymentForAdmissionController(cr *apiv1alpha1.IntegrityShield) *app
 			MountPath: "/run/secrets/tls",
 			Name:      "webhook-tls",
 			ReadOnly:  true,
+		},
+		{
+			MountPath: "/tmp",
+			Name:      "tmp",
 		},
 	}
 
@@ -252,6 +262,91 @@ func BuildDeploymentForAdmissionController(cr *apiv1alpha1.IntegrityShield) *app
 				},
 				Spec: v1.PodSpec{
 					ServiceAccountName: cr.Spec.Security.ACServiceAccountName,
+					SecurityContext:    cr.Spec.Security.PodSecurityContext,
+					Containers:         containers,
+					NodeSelector:       cr.Spec.NodeSelector,
+					Affinity:           cr.Spec.Affinity,
+					Tolerations:        cr.Spec.Tolerations,
+
+					Volumes: volumes,
+				},
+			},
+		},
+	}
+}
+
+// Observer
+func BuildDeploymentForObserver(cr *apiv1alpha1.IntegrityShield) *appsv1.Deployment {
+	labels := cr.Spec.Observer.SelectorLabels
+	var volumes []v1.Volume
+	volumes = []v1.Volume{
+		EmptyDirVolume("tmp"),
+	}
+	servervolumemounts := []v1.VolumeMount{
+		{
+			MountPath: "/tmp",
+			Name:      "tmp",
+		},
+	}
+
+	serverContainer := v1.Container{
+		Name:            cr.Spec.Observer.Name,
+		SecurityContext: cr.Spec.Observer.SecurityContext,
+		Image:           cr.Spec.Observer.Image,
+		ImagePullPolicy: cr.Spec.Observer.ImagePullPolicy,
+		VolumeMounts:    servervolumemounts,
+		Env: []v1.EnvVar{
+			{
+				Name:  "POD_NAMESPACE",
+				Value: cr.Namespace,
+			},
+			{
+				Name:  "LOG_LEVEL",
+				Value: cr.Spec.Observer.LogLevel,
+			},
+			{
+				Name:  "CONFIG_KEY",
+				Value: cr.Spec.Observer.TargetResourceConfigKey,
+			},
+			{
+				Name:  "TARGET_RESOURCE_CONFIG_NAME",
+				Value: cr.Spec.Observer.TargetResourceConfigName,
+			},
+			{
+				Name:  "INTERVAL",
+				Value: cr.Spec.Observer.Interval,
+			},
+		},
+		Resources: cr.Spec.ControllerContainer.Resources,
+	}
+
+	containers := []v1.Container{
+		serverContainer,
+	}
+
+	return &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cr.Spec.Observer.Name,
+			Namespace: cr.Namespace,
+			Labels:    labels,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Strategy: appsv1.DeploymentStrategy{
+				RollingUpdate: &appsv1.RollingUpdateDeployment{
+					MaxSurge:       cr.Spec.MaxSurge,
+					MaxUnavailable: cr.Spec.MaxUnavailable,
+				},
+			},
+			Replicas: cr.Spec.ReplicaCount,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: cr.Spec.Observer.SelectorLabels,
+			},
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: cr.Spec.Observer.SelectorLabels,
+				},
+				Spec: v1.PodSpec{
+					ServiceAccountName: cr.Spec.Security.ObserverServiceAccountName,
 					SecurityContext:    cr.Spec.Security.PodSecurityContext,
 					Containers:         containers,
 					NodeSelector:       cr.Spec.NodeSelector,

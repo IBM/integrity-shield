@@ -1,7 +1,7 @@
 apiVersion: apis.integrityshield.io/v1alpha1
 kind: IntegrityShield
 metadata:
-  name: integrityshield-sample
+  name: integrityshield-gatekeeper
 spec:
   # Add fields here
   affinity: {}
@@ -10,6 +10,9 @@ spec:
     shieldApiRole: ishield-sa-role
     shieldApiRoleBinding: ishield-sa-rolebinding
     podSecurityPolicyName: ishield-psp
+    observerServiceAccountName: observer-sa
+    observerRole: observer-role
+    observerRoleBinding: observer-rolebinding
     securityContext: {}
   shieldApiTlsSecretName: ishield-api-tls
   shieldApiServiceName: integrity-shield-api
@@ -17,7 +20,7 @@ spec:
   shieldApi:
     name: ishield-api
     imagePullPolicy: Always
-    image: localhost:5000/k8s-manifest-sigstore-integrity-shield:0.1.0
+    image: localhost:5000/k8s-manifest-integrity-shield-server:0.1.0
     port: 8080
     selector:     
       app: ishield-api
@@ -50,6 +53,7 @@ spec:
         - metadata.uid
         - metadata.generation
         - status
+        - metadata.annotations.cosign.sigstore.dev/imageRef
         objects:
         - name: '*'
       - fields:
@@ -377,3 +381,79 @@ spec:
                           "openshift-user-workload-monitoring",
                           "openshift-vsphere-infra"
                       ]
+  observer: 
+    name: ishield-observer
+    imagePullPolicy: Always
+    image: localhost:5000/k8s-manifest-integrity-shield-observer:0.1.0
+    selector:     
+      app: observer
+    logLevel: info
+    interval: "5"
+    targetResourceConfigName: target-resource-config
+    targetResourceConfigKey: "config.yaml"
+    targetResourceConfig: |
+      targetResouces:
+      - apiVersion: v1
+        resource:
+          namespaced: true
+          name: configmaps
+        targetNamespace:
+        - sample-ns
+        - secure-ns
+      - apiVersion: v1
+        apiGroup: apps
+        resource:
+          namespaced: true
+          name: deployments
+        targetNamespace:
+        - custom-ns
+      - apiVersion: v1
+        resource:
+          namespaced: true
+          name: services
+        targetNamespace:
+        - custom-ns
+      keyConfigs:
+      - keySecretName: akmebank-pub
+        keySecretNamespace: custom-ns
+      ignoreFields:
+      - fields:
+        - metadata.namespace
+        objects:
+        - kind: ClusterServiceVersion
+      - fields:
+        - metadata.managedFields.*
+        - metadata.resourceVersion
+        - metadata.selfLink
+        - metadata.annotations.control-plane.alpha.kubernetes.io/leader
+        - metadata.annotations.kubectl.kubernetes.io/last-applied-configuration
+        - metadata.finalizers*
+        - metadata.annotations.namespace
+        - metadata.annotations.deprecated.daemonset.template.generation
+        - metadata.creationTimestamp
+        - metadata.uid
+        - metadata.generation
+        - status
+        - metadata.annotations.cosign.sigstore.dev/imageRef
+        objects:
+        - name: '*'
+      - fields:
+        - secrets.*.name
+        - imagePullSecrets.*.name
+        objects:
+        - kind: ServiceAccount
+      - fields:
+        - spec.ports.*.nodePort
+        - spec.clusterIP
+        - spec.clusterIPs.0
+        objects:
+        - kind: Service
+      - fields:
+        - metadata.labels.olm.api.*
+        - metadata.labels.operators.coreos.com/*
+        - metadata.annotations.*
+        - spec.install.spec.deployments.*.spec.template.spec.containers.*.resources.limits.cpu
+        - spec.cleanup.enabled
+        objects:
+        - kind: ClusterServiceVersion   
+    

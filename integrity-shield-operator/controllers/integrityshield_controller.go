@@ -113,6 +113,28 @@ func (r *IntegrityShieldReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return recResult, recErr
 	}
 
+	// Observer
+	recResult, recErr = r.createOrUpdateObserverConfig(instance)
+	if recErr != nil || recResult.Requeue {
+		return recResult, recErr
+	}
+	recResult, recErr = r.createOrUpdateObserverServiceAccount(instance)
+	if recErr != nil || recResult.Requeue {
+		return recResult, recErr
+	}
+	recResult, recErr = r.createOrUpdateObserverClusterRoleForIShield(instance)
+	if recErr != nil || recResult.Requeue {
+		return recResult, recErr
+	}
+	recResult, recErr = r.createOrUpdateObserverClusterRoleBindingForIShield(instance)
+	if recErr != nil || recResult.Requeue {
+		return recResult, recErr
+	}
+	recResult, recErr = r.createOrUpdateObserverDeployment(instance)
+	if recErr != nil || recResult.Requeue {
+		return recResult, recErr
+	}
+
 	// Gatekeeper
 	if instance.Spec.UseGatekeeper {
 		//Service Account
