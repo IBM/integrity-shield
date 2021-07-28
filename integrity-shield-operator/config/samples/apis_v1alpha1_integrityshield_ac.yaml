@@ -232,6 +232,10 @@ spec:
       format: json
     selector:     
       app: ishield-validator
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
   webhookServerTlsSecretName: validator-tls
   webhookServiceName: validator-service
   webhookConfigName: ishield-validating-webhook-configuration
@@ -331,13 +335,14 @@ spec:
     resources: ["*"]
   useGatekeeper: false
   observer: 
+    enabled: false
     name: ishield-observer
     imagePullPolicy: Always
     image: localhost:5000/k8s-manifest-integrity-shield-observer:0.1.0
     selector:     
       app: observer
     logLevel: info
-    interval: "5"
+    interval: "60"
     targetResourceConfigName: target-resource-config
     targetResourceConfigKey: "config.yaml"
     targetResourceConfig: |

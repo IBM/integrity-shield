@@ -855,6 +855,8 @@ spec:
               observer:
                 description: observer
                 properties:
+                  enabled:
+                    type: boolean
                   image:
                     type: string
                   imagePullPolicy:

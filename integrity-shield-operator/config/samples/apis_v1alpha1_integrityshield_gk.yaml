@@ -24,6 +24,10 @@ spec:
     port: 8080
     selector:     
       app: ishield-api
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
   requestHandlerConfigKey: config.yaml
   requestHandlerConfigName: request-handler-config
   requestHandlerConfig: |
@@ -382,13 +386,14 @@ spec:
                           "openshift-vsphere-infra"
                       ]
   observer: 
+    enabled: false
     name: ishield-observer
     imagePullPolicy: Always
     image: localhost:5000/k8s-manifest-integrity-shield-observer:0.1.0
     selector:     
       app: observer
     logLevel: info
-    interval: "5"
+    interval: "60"
     targetResourceConfigName: target-resource-config
     targetResourceConfigKey: "config.yaml"
     targetResourceConfig: |

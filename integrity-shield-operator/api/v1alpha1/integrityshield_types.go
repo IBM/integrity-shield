@@ -119,6 +119,7 @@ type LogConfig struct {
 }
 
 type Observer struct {
+	Enabled                  bool                `json:"enabled,omitempty"`
 	Name                     string              `json:"name,omitempty"`
 	SelectorLabels           map[string]string   `json:"selector,omitempty"`
 	ImagePullPolicy          v1.PullPolicy       `json:"imagePullPolicy,omitempty"`
