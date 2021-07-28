@@ -346,30 +346,6 @@ spec:
     targetResourceConfigName: target-resource-config
     targetResourceConfigKey: "config.yaml"
     targetResourceConfig: |
-      targetResouces:
-      - apiVersion: v1
-        resource:
-          namespaced: true
-          name: configmaps
-        targetNamespace:
-        - sample-ns
-        - secure-ns
-      - apiVersion: v1
-        apiGroup: apps
-        resource:
-          namespaced: true
-          name: deployments
-        targetNamespace:
-        - custom-ns
-      - apiVersion: v1
-        resource:
-          namespaced: true
-          name: services
-        targetNamespace:
-        - custom-ns
-      keyConfigs:
-      - keySecretName: akmebank-pub
-        keySecretNamespace: custom-ns
       ignoreFields:
       - fields:
         - metadata.namespace

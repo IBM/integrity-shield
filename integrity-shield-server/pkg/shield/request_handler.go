@@ -195,10 +195,10 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 			"operation": req.Operation,
 		}).Debug("VerifyResource: ", result)
 		if err != nil {
-			log.Errorf("failed to check a requested resource; %s", err.Error())
+			log.Warning("verifyResource return error ; %s", err.Error())
 			return &ResultFromRequestHandler{
-				Allow:   true,
-				Message: "error but allow for development",
+				Allow:   false,
+				Message: err.Error(),
 			}
 		}
 		if result.InScope {

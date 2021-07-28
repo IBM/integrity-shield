@@ -1,3 +1,19 @@
+//
+// Copyright 2020 IBM Corporation
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
 package observer
 
 import (
@@ -44,17 +60,53 @@ type Inspector struct {
 	dynamicClient dynamic.Interface
 }
 
-type Result struct {
-	Summary     string         `json:"summary"`
-	Details     []ResultDetail `json:"details"`
-	LastUpdated string         `json:"lastUpdated"`
+type TargetResourceConfig struct {
+	TargetResources          []groupResourceWithTargetNS        `json:"targetResouces"`
+	IgnoreFields             k8smanifest.ObjectFieldBindingList `json:"ignoreFields,omitempty"`
+	KeyConfigs               []KeyConfig                        `json:"keyConfigs"`
+	ResourceProvenanceConfig ResourceProvenanceConfig           `json:"resourceProvenanceConfig,omitempty"`
 }
 
-type ResultDetail struct {
+type VerifyResult struct {
 	Resource    unstructured.Unstructured `json:"resource"`
 	Result      string                    `json:"result"`
 	Verified    bool                      `json:"verified"`
+	SigRef      string                    `json:"sigRef"`
 	Provenances []*k8smnfutil.Provenance  `json:"provenances"`
+}
+
+type FinalObservationResourceResult struct {
+	Namespace                 string                     `json:"namespace"`
+	Name                      string                     `json:"name"`
+	Kind                      string                     `json:"kind"`
+	ManifestProvenanceResults []ManifestProvenanceResult `json:"gitData"`
+}
+
+type ObservationResourceResult struct {
+	Namespace              string `json:"namespace"`
+	Name                   string `json:"name"`
+	Kind                   string `json:"kind"`
+	Resource               unstructured.Unstructured
+	ManifestProvenanceInfo []ManifestProvenanceFromVerifyResource `json:"manifestProvenanceInfo"`
+}
+
+type ManifestProvenanceFromVerifyResource struct {
+	Artifact  string `json:"artifact"`
+	GitApiURL string `json:"gitApiURL"`
+	GitRepo   string `json:"gitRepo"`
+	CommitID  string `json:"commitID"`
+	Hash      string `json:"hash"`
+}
+
+type ManifestProvenanceResult struct {
+	Artifact   string   `json:"artifact"`
+	GitRepo    string   `json:"gitRepo"`
+	GitApiURL  string   `json:"gitApiURL"`
+	CommitID   string   `json:"commitID"`
+	CommitDate string   `json:"commitDate"`
+	Author     string   `json:"author"`
+	Files      []string `json:"files"`
+	Hash       string   `json:"hash"`
 }
 
 type groupResourceWithTargetNS struct {
@@ -69,10 +121,14 @@ type groupResource struct {
 	APIResource metav1.APIResource `json:"resource"`
 }
 
-type TargetResourceConfig struct {
-	TargetResources []groupResourceWithTargetNS        `json:"targetResouces"`
-	IgnoreFields    k8smanifest.ObjectFieldBindingList `json:"ignoreFields,omitempty"`
-	KeyConfigs      []KeyConfig                        `json:"keyConfigs"`
+type ResourceProvenanceConfig struct {
+	AnalyzeCommitData bool             `json:"analyzeCommitData,omitempty"`
+	GitTokenConfigs   []GitTokenConfig `json:"gitTokenConfigs,omitempty"`
+}
+
+type GitTokenConfig struct {
+	GitToken        string `json:"gitToken"`
+	TargetNamespace string `json:"targetNamespace"`
 }
 
 type KeyConfig struct {
@@ -144,95 +200,60 @@ func (self *Inspector) Run() {
 		tmpResources, _ := self.getAllResoucesByGroupResource(gResource)
 		resources = append(resources, tmpResources...)
 	}
-
-	results := []ResultDetail{}
-	for _, resource := range resources {
-		log.Debug("Observed Resource:", resource.GetAPIVersion(), resource.GetKind(), resource.GetNamespace(), resource.GetName())
-		vo := &k8smanifest.VerifyResourceOption{}
-		vo.IgnoreFields = ignoreFields
-		vo.CheckDryRunForApply = true
-		vo.Provenance = true
-		annotations := resource.GetAnnotations()
-		annoImageRef, found := annotations[ImageRefAnnotationKey]
-		if found {
-			vo.ImageRef = annoImageRef
-		} else {
-			results = append(results, ResultDetail{
-				Resource: resource,
-				Result:   "no signature found",
-				Verified: false,
-			})
-			continue
-		}
-		// secret
-		log.Debug("secrets", secrets)
-		for _, s := range secrets {
-			if s.KeySecertNamespace == resource.GetNamespace() {
-				pubkey, err := LoadKeySecret(s.KeySecertNamespace, s.KeySecretName)
-				if err != nil {
-					fmt.Println("Failed to load pubkey; err: ", err.Error())
-				}
-				vo.KeyPath = pubkey
-				break
-			}
-		}
-		log.Debug("VerifyResourceOption", vo)
-		result, err := k8smanifest.VerifyResource(resource, vo)
-		if err != nil {
-			fmt.Println("Failed to verify resource; err: ", err.Error())
-			continue
-		}
-
-		message := ""
-		if result.InScope {
-			if result.Verified {
-				message = fmt.Sprintf("singed by a valid signer: %s", result.Signer)
-			} else {
-				message = "no signature found"
-				if result.Diff != nil && result.Diff.Size() > 0 {
-					message = fmt.Sprintf("diff found: %s", result.Diff.String())
-				} else if result.Signer != "" {
-					message = fmt.Sprintf("signer config not matched, this is signed by %s", result.Signer)
-				}
-			}
-		} else {
-			message = "not protected"
-		}
-		tmpMsg := strings.Split(message, " (Request: {")
-		resultMsg := ""
-		if len(tmpMsg) > 0 {
-			resultMsg = tmpMsg[0]
-		}
-		verified := result.Verified
-		results = append(results, ResultDetail{
-			Resource:    resource,
-			Result:      resultMsg,
-			Verified:    verified,
-			Provenances: result.Provenances,
-		})
-	}
-	// log
+	// check all resources by verifyResource
+	results := InspectResources(resources, ignoreFields, secrets)
+	// stdout log
 	fmt.Println("\nObservation time", time.Now().Format(timeFormat))
 	w := tabwriter.NewWriter(os.Stdout, 1, 1, 1, ' ', 0)
+	// signature verification
 	fmt.Fprintln(w, "Verified\tNamespace\tKind\tName\tMessage\t")
 	for _, res := range results {
 		resStr := strconv.FormatBool(res.Verified) + "\t" + res.Resource.GetNamespace() + "\t" + res.Resource.GetKind() + "\t" + res.Resource.GetName() + "\t" + res.Result + "\t"
 		fmt.Fprintln(w, resStr)
 	}
 	w.Flush()
-	// provenances log
 
-	for _, res := range results {
-		if len(res.Provenances) != 0 {
-			fmt.Println("\nProvenance result for", res.Resource.GetNamespace(), res.Resource.GetKind(), res.Resource.GetName())
-			var resultBytes []byte
-			for _, pr := range res.Provenances {
-				resultBytes, _ = json.MarshalIndent(pr, "", "    ")
-				fmt.Println(string(resultBytes))
+	if tconfig.ResourceProvenanceConfig.AnalyzeCommitData {
+		// provenances
+		var lastLog []FinalObservationResourceResult
+		f, err := os.Open("output.json")
+		if err != nil {
+			log.Debug("no file exists", err)
+		} else {
+			err = json.NewDecoder(f).Decode(&lastLog)
+			if err != nil {
+				fmt.Println("err", err)
 			}
 		}
+		defer f.Close()
+
+		finalObservationResults := InspectGitProvenance(lastLog, results, tconfig.ResourceProvenanceConfig.GitTokenConfigs)
+
+		// log
+		fmt.Println("\nProvenance log")
+		w = tabwriter.NewWriter(os.Stdout, 1, 1, 1, ' ', 0)
+		fmt.Fprintln(w, "Namespace\tKind\tName\tLastUpdate\tCommitID\tAuthor\tFiles\t")
+		for _, res := range finalObservationResults {
+			for _, pres := range res.ManifestProvenanceResults {
+				files := strings.Join(pres.Files, ",")
+				resStr := res.Namespace + "\t" + res.Kind + "\t" + res.Name + "\t" + pres.CommitDate + "\t" + pres.CommitID + "\t" + pres.Author + "\t" + files + "\t"
+				fmt.Fprintln(w, resStr)
+			}
+		}
+		w.Flush()
+
+		// export log
+		f, err = os.Create("output.json")
+		if err != nil {
+			return
+		}
+		defer f.Close()
+
+		err = json.NewEncoder(f).Encode(finalObservationResults)
+		if err != nil {
+			return
+		}
 	}
-	w.Flush()
 	return
 }
 
