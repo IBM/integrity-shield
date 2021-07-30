@@ -188,11 +188,15 @@ func (self *Inspector) Init() error {
 func (self *Inspector) Run() {
 	// load configmap
 	tconfig, err := loadTargetResourceConfig()
+	if err != nil {
+		fmt.Println("Failed to load TargetResourceConfig; err: ", err.Error())
+	}
 	narrowedGVKList := tconfig.TargetResources
 	ignoreFields := tconfig.IgnoreFields
 	secrets := tconfig.KeyConfigs
-	if err != nil {
-		fmt.Println("Failed to load TargetResourceConfig; err: ", err.Error())
+	if narrowedGVKList == nil {
+		fmt.Println("there is no resources to observe.")
+		return
 	}
 	// get all resources of extracted GVKs
 	resources := []unstructured.Unstructured{}

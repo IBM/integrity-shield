@@ -1,15 +1,15 @@
 apiVersion: apis.integrityshield.io/v1alpha1
 kind: IntegrityShield
 metadata:
-  name: integrityshield-ac
+  name: integrity-shield-admission-controller
 spec:
   # Add fields here
   affinity: {}
   security:
-    admissionControllerServiceAccountName: validator
-    admissionControllerClusterRole: validator-role
-    admissionControllerClusterRoleBinding: validator-rolebinding
-    podSecurityPolicyName: ishield-psp
+    admissionControllerServiceAccountName: integrity-shield-validator
+    admissionControllerClusterRole: integrity-shield-validator-role
+    admissionControllerClusterRoleBinding: integrity-shield-validator-rolebinding
+    podSecurityPolicyName: integrity-shield-psp
     securityContext: {}
   requestHandlerConfigKey: config.yaml
   requestHandlerConfigName: request-handler-config
@@ -223,7 +223,7 @@ spec:
         users: 
         - system:serviceaccount:openshift-operator-lifecycle-manager:olm-operator-serviceaccount
   admissionController: 
-    name: ishield-validator
+    name: integrity-shield-validator
     imagePullPolicy: Always
     image: localhost:5000/k8s-manifest-integrity-shield-admission-controller:0.1.0
     port: 9443
@@ -231,14 +231,14 @@ spec:
       level: inform
       format: json
     selector:     
-      app: ishield-validator
+      app: integrity-shield-validator
     resources:
       limits:
         cpu: 500m
         memory: 512Mi
-  webhookServerTlsSecretName: validator-tls
-  webhookServiceName: validator-service
-  webhookConfigName: ishield-validating-webhook-configuration
+  webhookServerTlsSecretName: integrity-shield-validator-tls
+  webhookServiceName: integrity-shield-validator-service
+  webhookConfigName: integrity-shield-validating-webhook-configuration
   admissionControllerConfigKey: config.yaml
   admissionControllerConfigName: admission-controller-config
   admissionControllerConfig: |
@@ -336,11 +336,11 @@ spec:
   useGatekeeper: false
   observer: 
     enabled: false
-    name: ishield-observer
+    name: integrity-shield-observer
     imagePullPolicy: Always
     image: localhost:5000/k8s-manifest-integrity-shield-observer:0.1.0
     selector:     
-      app: observer
+      app: integrity-shield-observer
     logLevel: info
     interval: "60"
     targetResourceConfigName: target-resource-config

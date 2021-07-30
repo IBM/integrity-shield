@@ -36,6 +36,10 @@ endif
 include  $(ENV_CONFIG)
 export $(shell sed 's/=.*//' $(ENV_CONFIG))
 
+# COPYRIGHT
+copyright:
+	bash $(ISHIELD_REPO_ROOT)/scripts/copyright.sh
+
 # LOG
 log-server:
 	bash $(ISHIELD_REPO_ROOT)/scripts/log_server.sh
@@ -50,12 +54,16 @@ log-ac-server:
 build-images:
 	bash $(ISHIELD_REPO_ROOT)/scripts/build_images.sh
 
+push-remote:
+	bash $(ISHIELD_REPO_ROOT)/scripts/push_images_remote.sh
+
+
 # DEPLOY
 deploy-op:
 	cd $(SHIELD_OP_DIR) && make deploy IMG=$(OPERATOR_IMG):$(VERSION)
 
 deploy-cr-gk:
-	kubectl create -f $(SHIELD_OP_DIR)config/samples/apis_v1alpha1_integrityshield_gk.yaml -n $(ISHIELD_NS)
+	kubectl create -f $(SHIELD_OP_DIR)config/samples/apis_v1alpha1_integrityshield.yaml -n $(ISHIELD_NS)
 
 deploy-cr-ac:
 	kubectl create -f $(SHIELD_OP_DIR)config/samples/apis_v1alpha1_integrityshield_ac.yaml -n $(ISHIELD_NS)
@@ -65,7 +73,52 @@ delete-op:
 	cd $(SHIELD_OP_DIR) && make undeploy
 
 delete-cr-gk:
-	kubectl delete -f $(SHIELD_OP_DIR)config/samples/apis_v1alpha1_integrityshield_gk.yaml -n $(ISHIELD_NS)
+	kubectl delete -f $(SHIELD_OP_DIR)config/samples/apis_v1alpha1_integrityshield.yaml -n $(ISHIELD_NS)
 
 delete-cr-ac:
 	kubectl delete -f $(SHIELD_OP_DIR)config/samples/apis_v1alpha1_integrityshield_ac.yaml -n $(ISHIELD_NS)
+
+# TEST
+e2e-test:
+	@echo
+	@echo run test
+	$(ISHIELD_REPO_ROOT)/scripts/check_test_results.sh
+
+test-e2e: export KUBECONFIG=$(SHIELD_OP_DIR)kubeconfig_managed
+# perform test in a kind cluster after creating the cluster
+test-e2e: create-kind-cluster build-images test-e2e-common test-e2e-clean-common delete-kind-cluster
+
+# common steps to do e2e test in an existing cluster
+test-e2e-common: check-kubeconfig deploy-op setup-test-env e2e-test
+
+setup-test-env:
+	@echo
+	@echo creating test namespace
+	kubectl create ns $(TEST_NS)
+	kubectl create ns $(TEST_UNPROTECTED_NS)
+
+clean-test-env:
+	@echo
+	@echo deleting test namespace
+	kubectl delete ns $(TEST_NS)
+	kubectl delete ns $(TEST_UNPROTECTED_NS)
+
+create-kind-cluster:
+	@echo "creating cluster"
+	# kind create cluster --name test-managed
+	bash $(SHIELD_OP_DIR)test/create-kind-cluster.sh
+	kind get kubeconfig --name test-managed > $(SHIELD_OP_DIR)kubeconfig_managed
+
+delete-kind-cluster:
+	@echo deleting cluster
+	kind delete cluster --name test-managed
+
+check-kubeconfig:
+	@if [ -z "$(KUBECONFIG)" ]; then \
+		echo KUBECONFIG is empty.; \
+		exit 1;\
+	fi
+
+# BUNDLE
+build-bundle:
+		$(ISHIELD_REPO_ROOT)/scripts/build_bundle.sh

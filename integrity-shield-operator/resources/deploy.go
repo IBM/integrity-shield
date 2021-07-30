@@ -33,7 +33,7 @@ import (
 func BuildDeploymentForIShieldServer(cr *apiv1alpha1.IntegrityShield) *appsv1.Deployment {
 	var servervolumemounts []v1.VolumeMount
 	var volumes []v1.Volume
-
+	labels := cr.Spec.MetaLabels
 	volumes = []v1.Volume{
 		SecretVolume("ishield-api-certs", cr.Spec.ServerTlsSecretName),
 		EmptyDirVolume("tmp"),
@@ -111,9 +111,7 @@ func BuildDeploymentForIShieldServer(cr *apiv1alpha1.IntegrityShield) *appsv1.De
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cr.Spec.Server.Name,
 			Namespace: cr.Namespace,
-			Labels: map[string]string{
-				"app": apiv1alpha1.DefaultIShieldAPILabel,
-			},
+			Labels:    labels,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Strategy: appsv1.DeploymentStrategy{
@@ -147,7 +145,7 @@ func BuildDeploymentForIShieldServer(cr *apiv1alpha1.IntegrityShield) *appsv1.De
 
 // admission controller
 func BuildDeploymentForAdmissionController(cr *apiv1alpha1.IntegrityShield) *appsv1.Deployment {
-	labels := cr.Spec.ControllerContainer.SelectorLabels
+	labels := cr.Spec.MetaLabels
 	var servervolumemounts []v1.VolumeMount
 	var volumes []v1.Volume
 
@@ -277,7 +275,7 @@ func BuildDeploymentForAdmissionController(cr *apiv1alpha1.IntegrityShield) *app
 
 // Observer
 func BuildDeploymentForObserver(cr *apiv1alpha1.IntegrityShield) *appsv1.Deployment {
-	labels := cr.Spec.Observer.SelectorLabels
+	labels := cr.Spec.MetaLabels
 	var volumes []v1.Volume
 	volumes = []v1.Volume{
 		EmptyDirVolume("tmp"),

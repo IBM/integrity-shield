@@ -44,11 +44,11 @@ if [ $exit_status -ne 0 ]; then
     exit 1
 fi
 if [ "$NO_CACHE" = true ] ; then
-    docker build -t ${OPERATOR_IMG}:${VERSION} . --no-cache
-    docker push ${OPERATOR_IMG}:${VERSION}
+    docker build -t ${TEST_ISHIELD_OPERATOR_IMAGE_NAME_AND_VERSION} . --no-cache
+    docker push ${TEST_ISHIELD_OPERATOR_IMAGE_NAME_AND_VERSION}
 else
-    docker build -t ${OPERATOR_IMG}:${VERSION} .
-    docker push ${OPERATOR_IMG}:${VERSION}
+    docker build -t ${TEST_ISHIELD_OPERATOR_IMAGE_NAME_AND_VERSION} .
+    docker push ${TEST_ISHIELD_OPERATOR_IMAGE_NAME_AND_VERSION}
 fi
 
 # Build ishield-ac-server image
@@ -68,11 +68,11 @@ if [ $exit_status -ne 0 ]; then
     exit 1
 fi
 if [ "$NO_CACHE" = true ] ; then
-    docker build -t ${AC_IMG}:${VERSION} . --no-cache
-    docker push ${AC_IMG}:${VERSION}
+    docker build -t ${TEST_ISHIELD_ADMISSION_CONTROLLER_IMAGE_NAME_AND_VERSION} . --no-cache
+    docker push ${TEST_ISHIELD_ADMISSION_CONTROLLER_IMAGE_NAME_AND_VERSION}
 else
-    docker build -t ${AC_IMG}:${VERSION} .
-    docker push ${AC_IMG}:${VERSION}
+    docker build -t ${TEST_ISHIELD_ADMISSION_CONTROLLER_IMAGE_NAME_AND_VERSION} .
+    docker push ${TEST_ISHIELD_ADMISSION_CONTROLLER_IMAGE_NAME_AND_VERSION}
 fi
 
 # Build ishield-api-server image
@@ -92,11 +92,11 @@ if [ $exit_status -ne 0 ]; then
     exit 1
 fi
 if [ "$NO_CACHE" = true ] ; then
-    docker build -t ${SERVER_IMG}:${VERSION} . --no-cache
-    docker push ${SERVER_IMG}:${VERSION}
+    docker build -t ${TEST_ISHIELD_SERVER_IMAGE_NAME_AND_VERSION} . --no-cache
+    docker push ${TEST_ISHIELD_SERVER_IMAGE_NAME_AND_VERSION}
 else
-    docker build -t ${SERVER_IMG}:${VERSION} .
-    docker push ${SERVER_IMG}:${VERSION}
+    docker build -t ${TEST_ISHIELD_SERVER_IMAGE_NAME_AND_VERSION} .
+    docker push ${TEST_ISHIELD_SERVER_IMAGE_NAME_AND_VERSION}
 fi
 
 # Build ishield-observer image
@@ -116,9 +116,9 @@ if [ $exit_status -ne 0 ]; then
     exit 1
 fi
 if [ "$NO_CACHE" = true ] ; then
-    docker build -t ${OBSERVER_IMG}:${VERSION} . --no-cache
-    docker push ${OBSERVER_IMG}:${VERSION}
+    docker build -t ${TEST_ISHIELD_OBSERVER_IMAGE_NAME_AND_VERSION} . --no-cache
+    docker push ${TEST_ISHIELD_OBSERVER_IMAGE_NAME_AND_VERSION}
 else
-    docker build -t ${OBSERVER_IMG}:${VERSION} .
-    docker push ${OBSERVER_IMG}:${VERSION}
+    docker build -t ${TEST_ISHIELD_OBSERVER_IMAGE_NAME_AND_VERSION} .
+    docker push ${TEST_ISHIELD_OBSERVER_IMAGE_NAME_AND_VERSION}
 fi

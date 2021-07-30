@@ -17,6 +17,8 @@
 package resources
 
 import (
+	"strings"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1alpha1 "github.com/IBM/integrity-shield/integrity-shield-operator/api/v1alpha1"
@@ -32,10 +34,11 @@ func BuildConstraintTemplateForIShield(cr *apiv1alpha1.IntegrityShield) *v1beta1
 			},
 		},
 	}
+	rego := strings.Replace(cr.Spec.Rego, "RPLACE_WITH_SERVER_NAMESPSCE", cr.Namespace, 1)
 	targets := []v1beta1.Target{
 		{
 			Target: "admission.k8s.gatekeeper.sh",
-			Rego:   cr.Spec.Rego,
+			Rego:   rego,
 		},
 	}
 	template := &v1beta1.ConstraintTemplate{
