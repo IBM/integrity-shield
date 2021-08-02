@@ -24,9 +24,9 @@ if [ -z "$ISHIELD_NS" ]; then
     exit 1
 fi
 
-ISHIELD_AC_SERVER_POD=`kubectl get pod -n ${ISHIELD_NS} | grep ishield-validator | grep Running | awk '{print $1}'`
+ISHIELD_AC_SERVER_POD=`kubectl get pod -n ${ISHIELD_NS} | grep integrity-shield-validator | grep Running | awk '{print $1}'`
 if [ -z "$ISHIELD_AC_SERVER_POD" ]; then
-    echo "ISHIELD_AC_SERVER_POD is empty. There is no running ishield-validator"
+    echo "ISHIELD_AC_SERVER_POD is empty. There is no running integrity-shield-validator"
     exit 1
 fi
 

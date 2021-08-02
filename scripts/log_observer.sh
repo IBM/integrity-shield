@@ -24,9 +24,9 @@ if [ -z "$ISHIELD_NS" ]; then
     exit 1
 fi
 
-iISHIELD_OBSERVER_POD=`kubectl get pod -n ${ISHIELD_NS} | grep ishield-observer | grep Running | awk '{print $1}'`
+iISHIELD_OBSERVER_POD=`kubectl get pod -n ${ISHIELD_NS} | grep integrity-shield-observer | grep Running | awk '{print $1}'`
 if [ -z "$iISHIELD_OBSERVER_POD" ]; then
-    echo "iISHIELD_OBSERVER_POD is empty. There is no running ishield-observer"
+    echo "iISHIELD_OBSERVER_POD is empty. There is no running integrity-shield-observer"
     exit 1
 fi
 
