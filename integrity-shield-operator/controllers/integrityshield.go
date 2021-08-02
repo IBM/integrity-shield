@@ -565,12 +565,22 @@ func (r *IntegrityShieldReconciler) createOrUpdateRoleBindingForIShield(
 	expected := res.BuildRoleBindingForIShield(instance)
 	return r.createOrUpdateClusterRoleBinding(instance, expected)
 }
+func (r *IntegrityShieldReconciler) deleteRoleBindingForIShield(
+	instance *apiv1alpha1.IntegrityShield) (ctrl.Result, error) {
+	expected := res.BuildRoleBindingForIShield(instance)
+	return r.deleteClusterRoleBinding(instance, expected)
+}
 
 // role for api sa
 func (r *IntegrityShieldReconciler) createOrUpdateRoleForIShield(
 	instance *apiv1alpha1.IntegrityShield) (ctrl.Result, error) {
 	expected := res.BuildRoleForIShield(instance)
 	return r.createOrUpdateClusterRole(instance, expected)
+}
+func (r *IntegrityShieldReconciler) deleteRoleForIShield(
+	instance *apiv1alpha1.IntegrityShield) (ctrl.Result, error) {
+	expected := res.BuildRoleForIShield(instance)
+	return r.deleteClusterRole(instance, expected)
 }
 
 func (r *IntegrityShieldReconciler) createOrUpdatePodSecurityPolicy(instance *apiv1alpha1.IntegrityShield) (ctrl.Result, error) {
@@ -931,7 +941,7 @@ func (r *IntegrityShieldReconciler) createOrUpdateWebhook(instance *apiv1alpha1.
 func (r *IntegrityShieldReconciler) deleteWebhook(instance *apiv1alpha1.IntegrityShield) (ctrl.Result, error) {
 	ctx := context.Background()
 	expected := res.BuildValidatingWebhookConfigurationForIShield(instance)
-	found := &admregv1.MutatingWebhookConfiguration{}
+	found := &admregv1.ValidatingWebhookConfiguration{}
 
 	reqLogger := r.Log.WithValues(
 		"Instance.Name", instance.Name,
@@ -1100,4 +1110,31 @@ func (r *IntegrityShieldReconciler) createOrUpdateConstraintTemplate(instance *a
 
 	// No reconcile was necessary
 	return ctrl.Result{}, nil
+}
+
+// delete ishield-psp
+func (r *IntegrityShieldReconciler) deleteConstraintTemplate(instance *apiv1alpha1.IntegrityShield) (ctrl.Result, error) {
+	ctx := context.Background()
+	found := &templatev1.ConstraintTemplate{}
+	expected := res.BuildConstraintTemplateForIShield(instance)
+
+	reqLogger := r.Log.WithValues(
+		"Instance.Name", instance.Name,
+		"ConstraintTemplate.Name", expected.Name)
+
+	err := r.Get(ctx, types.NamespacedName{Name: expected.Name}, found)
+
+	if err == nil {
+		reqLogger.Info("Deleting the IShield ConstraintTemplate")
+		err = r.Delete(ctx, found)
+		if err != nil {
+			reqLogger.Error(err, "Failed to delete the IShield ConstraintTemplate")
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 1}, nil
+	} else if errors.IsNotFound(err) {
+		return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 1}, nil
+	} else {
+		return ctrl.Result{}, err
+	}
 }

@@ -257,25 +257,56 @@ func (r *IntegrityShieldReconciler) deleteClusterScopedChildrenResources(instanc
 	// delete any cluster scope resources owned by the instance
 	// (In Iubernetes 1.20 and later, a garbage collector ignore cluster scope children even if their owner is deleted)
 	var err error
-	_, err = r.deleteWebhook(instance)
-	if err != nil {
-		return err
+	if instance.Spec.UseGatekeeper {
+		// rolebinding for api sa
+		// TODO: will be removed after fix role/rolebinding
+		_, err = r.deleteRoleBindingForIShield(instance)
+		if err != nil {
+			return err
+		}
+		_, err = r.deleteRoleForIShield(instance)
+		if err != nil {
+			return err
+		}
+		_, err = r.deleteConstraintTemplate(instance)
+		if err != nil {
+			return err
+		}
+	} else {
+		_, err = r.deleteWebhook(instance)
+		if err != nil {
+			return err
+		}
+		//Cluster Role
+		_, err = r.deleteClusterRoleForIShield(instance)
+		if err != nil {
+			return err
+		}
+		//Cluster Role Binding
+		_, err = r.deleteClusterRoleBindingForIShield(instance)
+		if err != nil {
+			return err
+		}
+		// CRD
+		_, err = r.deleteManifestIntegrityProfileCRD(instance)
+		if err != nil {
+			return err
+		}
 	}
 	_, err = r.deletePodSecurityPolicy(instance)
 	if err != nil {
 		return err
 	}
-	_, err = r.deleteClusterRoleBindingForIShield(instance)
-	if err != nil {
-		return err
-	}
-	_, err = r.deleteClusterRoleForIShield(instance)
-	if err != nil {
-		return err
-	}
-	_, err = r.deleteManifestIntegrityProfileCRD(instance)
-	if err != nil {
-		return err
+
+	if instance.Spec.Observer.Enabled {
+		_, err = r.deleteObserverClusterRoleForIShield(instance)
+		if err != nil {
+			return err
+		}
+		_, err = r.deleteObserverClusterRoleBindingForIShield(instance)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

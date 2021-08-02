@@ -2,6 +2,8 @@ apiVersion: apis.integrityshield.io/v1alpha1
 kind: IntegrityShield
 metadata:
   name: integrity-shield-admission-controller
+  finalizers:
+  - cleanup.finalizers.integrityshield.io
 spec:
   # Add fields here
   affinity: {}

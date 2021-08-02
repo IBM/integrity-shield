@@ -137,6 +137,14 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 	// setup log
 	k8smnfconfig.SetupLogger(rhconfig.Log, req)
 
+	log.WithFields(log.Fields{
+		"namespace": req.Namespace,
+		"name":      req.Name,
+		"kind":      req.Kind.Kind,
+		"operation": req.Operation,
+		"userName":  req.UserInfo.Username,
+	}).Debug("Process new request")
+
 	commonSkipUserMatched := false
 	skipObjectMatched := false
 	if rhconfig != nil {
@@ -185,7 +193,13 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 		message = "verification of this resource is skipped"
 	} else {
 		vo := setVerifyOption(paramObj, rhconfig)
-		log.Debug("VerifyOption: ", vo)
+		log.WithFields(log.Fields{
+			"namespace": req.Namespace,
+			"name":      req.Name,
+			"kind":      req.Kind.Kind,
+			"operation": req.Operation,
+			"userName":  req.UserInfo.Username,
+		}).Debug("VerifyOption: ", vo)
 		// call VerifyResource with resource, verifyOption, keypath, imageRef
 		result, err := k8smanifest.VerifyResource(resource, vo)
 		log.WithFields(log.Fields{
@@ -193,7 +207,8 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 			"name":      req.Name,
 			"kind":      req.Kind.Kind,
 			"operation": req.Operation,
-		}).Debug("VerifyResource: ", result)
+			"userName":  req.UserInfo.Username,
+		}).Debug("VerifyResource result: ", result)
 		if err != nil {
 			log.Warning("verifyResource return error ; %s", err.Error())
 			return &ResultFromRequestHandler{
@@ -231,6 +246,7 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 		"name":      req.Name,
 		"kind":      req.Kind.Kind,
 		"operation": req.Operation,
+		"userName":  req.UserInfo.Username,
 		"allow":     r.Allow,
 	}).Info(r.Message)
 
@@ -287,7 +303,7 @@ func mutationCheck(rawOldObject, rawObject []byte, IgnoreFields []string) (bool,
 	}
 	// diff
 	dr := oldObject.Diff(newObject)
-	if dr.Size() == 0 {
+	if dr == nil || dr.Size() == 0 {
 		return false, nil
 	}
 	// ignoreField check
