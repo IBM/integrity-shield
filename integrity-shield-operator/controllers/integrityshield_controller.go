@@ -174,11 +174,14 @@ func (r *IntegrityShieldReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		if recErr != nil || recResult.Requeue {
 			return recResult, recErr
 		}
-
-		// Gatekeeper constraint template
-		recResult, recErr = r.createOrUpdateConstraintTemplate(instance)
-		if recErr != nil || recResult.Requeue {
-			return recResult, recErr
+		if r.isGatekeeperAvailable(instance) {
+			// Gatekeeper constraint template
+			recResult, recErr = r.createOrUpdateConstraintTemplate(instance)
+			if recErr != nil || recResult.Requeue {
+				return recResult, recErr
+			}
+		} else {
+			return ctrl.Result{Requeue: true}, nil
 		}
 
 	} else { // If use admission controller instead of Gatekeeper

@@ -180,7 +180,7 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 		}
 	}
 
-	allow := true
+	allow := false
 	message := ""
 	if skipUserMatched || commonSkipUserMatched {
 		allow = true
@@ -193,13 +193,6 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 		message = "verification of this resource is skipped"
 	} else {
 		vo := setVerifyOption(paramObj, rhconfig)
-		log.WithFields(log.Fields{
-			"namespace": req.Namespace,
-			"name":      req.Name,
-			"kind":      req.Kind.Kind,
-			"operation": req.Operation,
-			"userName":  req.UserInfo.Username,
-		}).Debug("VerifyOption: ", vo)
 		// call VerifyResource with resource, verifyOption, keypath, imageRef
 		result, err := k8smanifest.VerifyResource(resource, vo)
 		log.WithFields(log.Fields{

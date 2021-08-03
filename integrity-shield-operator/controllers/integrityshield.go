@@ -1112,6 +1112,25 @@ func (r *IntegrityShieldReconciler) createOrUpdateConstraintTemplate(instance *a
 	return ctrl.Result{}, nil
 }
 
+func (r *IntegrityShieldReconciler) isGatekeeperAvailable(instance *apiv1alpha1.IntegrityShield) bool {
+	ctx := context.Background()
+	found := &extv1.CustomResourceDefinition{}
+
+	reqLogger := r.Log.WithValues(
+		"Instance.Name", instance.Name,
+		"ConstraintTemplate.Name", "constrainttemplates.templates.gatekeeper.sh")
+
+	// If Constraint template does not exist, return false
+	err := r.Get(ctx, types.NamespacedName{Name: "constrainttemplates.templates.gatekeeper.sh"}, found)
+	if err != nil && errors.IsNotFound(err) {
+		reqLogger.Info("Gatekeeper constraint template crd is not found")
+		return false
+	} else if err != nil {
+		return false
+	}
+	return true
+}
+
 // delete ishield-psp
 func (r *IntegrityShieldReconciler) deleteConstraintTemplate(instance *apiv1alpha1.IntegrityShield) (ctrl.Result, error) {
 	ctx := context.Background()

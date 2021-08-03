@@ -26,6 +26,10 @@ ifeq ($(ISHIELD_NS),)
 $(error ISHIELD_NS is not set)
 endif
 
+ifeq ($(ISHIELD_ENV),)
+$(error ISHIELD_ENV is not set. Please set local or remote.)
+endif
+
 include  .env
 export $(shell sed 's/=.*//' .env)
 
@@ -35,6 +39,13 @@ endif
 
 include  $(ENV_CONFIG)
 export $(shell sed 's/=.*//' $(ENV_CONFIG))
+
+
+ifeq ($(ISHIELD_ENV), remote)
+OPERATOR_IMG=$(ISHIELD_OPERATOR_IMAGE_NAME_AND_VERSION)
+else
+OPERATOR_IMG=$(TEST_ISHIELD_OPERATOR_IMAGE_NAME_AND_VERSION)
+endif
 
 # COPYRIGHT
 copyright:
@@ -60,7 +71,7 @@ push-remote:
 
 # DEPLOY
 deploy-op:
-	cd $(SHIELD_OP_DIR) && make deploy IMG=$(OPERATOR_IMG):$(VERSION)
+	cd $(SHIELD_OP_DIR) && make deploy IMG=$(OPERATOR_IMG)
 
 deploy-cr-gk:
 	kubectl create -f $(SHIELD_OP_DIR)config/samples/apis_v1alpha1_integrityshield.yaml -n $(ISHIELD_NS)
