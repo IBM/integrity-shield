@@ -8,7 +8,6 @@ require (
 	github.com/onsi/ginkgo v1.16.4 // indirect
 	github.com/onsi/gomega v1.13.0 // indirect
 	github.com/pkg/errors v0.9.1
-	github.com/sigstore/cosign v1.0.1 // indirect
 	github.com/sigstore/k8s-manifest-sigstore v0.0.0-20210730144819-a9407f0b5806
 	github.com/sirupsen/logrus v1.8.1
 	k8s.io/api v0.21.3
@@ -20,7 +19,7 @@ require (
 
 replace (
 	github.com/IBM/integrity-shield/integrity-shield-server => ./
-	github.com/sigstore/k8s-manifest-sigstore => github.com/hirokuni-kitahara/k8s-manifest-sigstore v0.0.0-20210802051111-9d6ddbbb06da
+	github.com/sigstore/k8s-manifest-sigstore => github.com/hirokuni-kitahara/k8s-manifest-sigstore v0.0.0-20210804055016-a9c8be268175
 	k8s.io/api => k8s.io/api v0.19.0
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.19.0
 	k8s.io/apimachinery => k8s.io/apimachinery v0.19.0

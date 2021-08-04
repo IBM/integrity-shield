@@ -16,6 +16,8 @@ spec:
   requestHandlerConfigKey: config.yaml
   requestHandlerConfigName: request-handler-config
   requestHandlerConfig: |
+    sideEffect: 
+      createDenyEvent: true
     log:
       level: info
       manifestSigstoreLogLevel: info
@@ -43,6 +45,10 @@ spec:
         - metadata.generation
         - status
         - metadata.annotations.cosign.sigstore.dev/imageRef
+        - metadata.annotations.cosign.sigstore.dev/bundle
+        - metadata.annotations.cosign.sigstore.dev/message
+        - metadata.annotations.cosign.sigstore.dev/certificate
+        - metadata.annotations.cosign.sigstore.dev/signature
         objects:
         - name: '*'
       - fields:
@@ -255,7 +261,6 @@ spec:
     mode: enforce
     sideEffect: 
       updateMIPStatusForDeniedRequest: true
-      createDenyEvent: true
     inScopeNamespaceSelector:
       exclude:
       - kube-node-lease
@@ -367,6 +372,10 @@ spec:
         - metadata.generation
         - status
         - metadata.annotations.cosign.sigstore.dev/imageRef
+        - metadata.annotations.cosign.sigstore.dev/bundle
+        - metadata.annotations.cosign.sigstore.dev/message
+        - metadata.annotations.cosign.sigstore.dev/certificate
+        - metadata.annotations.cosign.sigstore.dev/signature
         objects:
         - name: '*'
       - fields:

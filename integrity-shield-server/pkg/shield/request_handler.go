@@ -17,15 +17,12 @@
 package shield
 
 import (
-	"bytes"
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -40,6 +37,10 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	kubeclient "k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	corev1 "k8s.io/api/core/v1"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 const remoteRequestHandlerURL = "https://integrity-shield-api.k8s-manifest-sigstore.svc:8123/api/request"
@@ -47,64 +48,10 @@ const defaultConfigKeyInConfigMap = "config.yaml"
 const defaultPodNamespace = "k8s-manifest-sigstore"
 const defaultHandlerConfigMapName = "request-handler-config"
 
-func RequestHandlerController(remote bool, req admission.Request, paramObj *k8smnfconfig.ParameterObject) *ResultFromRequestHandler {
-	r := &ResultFromRequestHandler{}
-	if remote {
-		// http call to remote request handler service
-		input := &RemoteRequestHandlerInputMap{
-			Request:   req,
-			Parameter: *paramObj,
-		}
-
-		inputjson, _ := json.Marshal(input)
-		transCfg := &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}
-		client := &http.Client{Transport: transCfg}
-		res, err := client.Post(remoteRequestHandlerURL, "application/json", bytes.NewBuffer([]byte(inputjson)))
-		if err != nil {
-			log.Error("Error reported from Remote RequestHandler", err.Error())
-			return &ResultFromRequestHandler{
-				Allow:   true,
-				Message: "error but allow for development",
-			}
-		}
-		if res.StatusCode != 200 {
-			log.Error("Error reported from Remote RequestHandler: statusCode is not 200")
-			return &ResultFromRequestHandler{
-				Allow:   true,
-				Message: "error but allow for development",
-			}
-		}
-		body, err := ioutil.ReadAll(res.Body)
-		if err != nil {
-			log.Error("error: fail to read body: ", err)
-			return &ResultFromRequestHandler{
-				Allow:   true,
-				Message: "error but allow for development",
-			}
-		}
-		err = json.Unmarshal([]byte(string(body)), &r)
-		if err != nil {
-			log.Error("error: fail to Unmarshal: ", err)
-			return &ResultFromRequestHandler{
-				Allow:   true,
-				Message: "error but allow for development",
-			}
-		}
-		log.WithFields(log.Fields{
-			"namespace": req.Namespace,
-			"name":      req.Name,
-			"kind":      req.Kind.Kind,
-			"operation": req.Operation,
-		}).Debug("Response from remote request handler ", r)
-		return r
-	} else {
-		// local request handler
-		r = RequestHandler(req, paramObj)
-	}
-	return r
-}
+const (
+	EventTypeAnnotationKey       = "integrityshield.io/eventType"
+	EventTypeAnnotationValueDeny = "deny"
+)
 
 func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObject) *ResultFromRequestHandler {
 	// unmarshal admission request object
@@ -203,7 +150,7 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 			"userName":  req.UserInfo.Username,
 		}).Debug("VerifyResource result: ", result)
 		if err != nil {
-			log.Warning("verifyResource return error ; %s", err.Error())
+			log.Warning("Signature verification is required for this request, but verifyResource return error ; %s", err.Error())
 			return &ResultFromRequestHandler{
 				Allow:   false,
 				Message: err.Error(),
@@ -215,11 +162,11 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 				message = fmt.Sprintf("singed by a valid signer: %s", result.Signer)
 			} else {
 				allow = false
-				message = "no signature found"
+				message = "Signature verification is required for this request, but no signature is found."
 				if result.Diff != nil && result.Diff.Size() > 0 {
-					message = fmt.Sprintf("diff found: %s", result.Diff.String())
+					message = fmt.Sprintf("Signature verification is required for this request, but failed to verify signature. diff found: %s", result.Diff.String())
 				} else if result.Signer != "" {
-					message = fmt.Sprintf("signer config not matched, this is signed by %s", result.Signer)
+					message = fmt.Sprintf("Signature verification is required for this request, but no signer config matches with this resource. This is signed by %s", result.Signer)
 				}
 			}
 		} else {
@@ -231,6 +178,11 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 	r := &ResultFromRequestHandler{
 		Allow:   allow,
 		Message: message,
+	}
+
+	// generate events
+	if rhconfig.SideEffectConfig.CreateDenyEvent {
+		_ = createOrUpdateEvent(req, r)
 	}
 
 	// log
@@ -395,7 +347,91 @@ func skipObjectsMatch(l k8smanifest.ObjectReferenceList, obj unstructured.Unstru
 	return false
 }
 
-type RemoteRequestHandlerInputMap struct {
-	Request   admission.Request            `json:"request,omitempty"`
-	Parameter k8smnfconfig.ParameterObject `json:"parameters,omitempty"`
+func createOrUpdateEvent(req admission.Request, ar *ResultFromRequestHandler) error {
+	// no event is generated for allowed request
+	if ar.Allow {
+		return nil
+	}
+
+	config, err := kubeutil.GetKubeConfig()
+	if err != nil {
+		return err
+	}
+	client, err := kubeclient.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+
+	namespace := os.Getenv("POD_NAMESPACE")
+	if namespace == "" {
+		namespace = defaultPodNamespace
+	}
+	gv := schema.GroupVersion{Group: req.Kind.Group, Version: req.Kind.Version}
+	evtNamespace := req.Namespace
+	if evtNamespace == "" {
+		evtNamespace = namespace
+	}
+	involvedObject := corev1.ObjectReference{
+		Namespace:  req.Namespace,
+		APIVersion: gv.String(),
+		Kind:       req.Kind.Kind,
+		Name:       req.Name,
+	}
+	evtName := fmt.Sprintf("ishield-deny-%s-%s-%s", strings.ToLower(string(req.Operation)), strings.ToLower(req.Kind.Kind), req.Name)
+	sourceName := "IntegrityShield"
+
+	now := time.Now()
+	evt := &corev1.Event{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      evtName,
+			Namespace: evtNamespace,
+			Annotations: map[string]string{
+				EventTypeAnnotationKey: EventTypeAnnotationValueDeny,
+			},
+		},
+		InvolvedObject:      involvedObject,
+		Type:                sourceName,
+		Source:              corev1.EventSource{Component: sourceName},
+		ReportingController: sourceName,
+		ReportingInstance:   evtName,
+		Action:              evtName,
+		Reason:              "Deny",
+		FirstTimestamp:      metav1.NewTime(now),
+	}
+	isExistingEvent := false
+	current, getErr := client.CoreV1().Events(evtNamespace).Get(context.Background(), evtName, metav1.GetOptions{})
+	if current != nil && getErr == nil {
+		isExistingEvent = true
+		evt = current
+	}
+
+	// tmpMessage := "[" + constraintName + "]" + ar.Message
+	tmpMessage := ar.Message
+	// Event.Message can have 1024 chars at most
+	if len(tmpMessage) > 1024 {
+		tmpMessage = tmpMessage[:950] + " ... Trimmed. `Event.Message` can have 1024 chars at maximum."
+	}
+	evt.Message = tmpMessage
+	evt.Count = evt.Count + 1
+	evt.EventTime = metav1.NewMicroTime(now)
+	evt.LastTimestamp = metav1.NewTime(now)
+
+	if isExistingEvent {
+		_, err = client.CoreV1().Events(evtNamespace).Update(context.Background(), evt, metav1.UpdateOptions{})
+	} else {
+		_, err = client.CoreV1().Events(evtNamespace).Create(context.Background(), evt, metav1.CreateOptions{})
+	}
+	if err != nil {
+		log.Errorf("failed to generate deny event; %s", err.Error())
+		return err
+	}
+
+	log.WithFields(log.Fields{
+		"namespace": req.Namespace,
+		"name":      req.Name,
+		"kind":      req.Kind.Kind,
+		"operation": req.Operation,
+	}).Debug("Deny event is generated:", evtName)
+
+	return nil
 }

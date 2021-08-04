@@ -33,18 +33,19 @@ func InspectResources(resources []unstructured.Unstructured, ignoreFields k8sman
 		vo.IgnoreFields = ignoreFields
 		vo.CheckDryRunForApply = true
 		vo.Provenance = true
-		annotations := resource.GetAnnotations()
-		annoImageRef, found := annotations[ImageRefAnnotationKey]
-		if found {
-			vo.ImageRef = annoImageRef
-		} else {
-			results = append(results, VerifyResult{
-				Resource: resource,
-				Result:   "no signature found",
-				Verified: false,
-			})
-			continue
-		}
+		// annotations := resource.GetAnnotations()
+		// annoImageRef, found := annotations[ImageRefAnnotationKey]
+		// if found {
+		// 	vo.ImageRef = annoImageRef
+		// } else {
+		// 	results = append(results, VerifyResult{
+		// 		Resource: resource,
+		// 		Result:   "no signature found",
+		// 		Verified: false,
+		// 	})
+		// 	continue
+		// }
+
 		// secret
 		for _, s := range secrets {
 			if s.KeySecertNamespace == resource.GetNamespace() {

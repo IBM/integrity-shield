@@ -27,6 +27,7 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/in-toto/in-toto-golang/in_toto"
+	"github.com/sigstore/k8s-manifest-sigstore/pkg/k8smanifest"
 	k8smnfutil "github.com/sigstore/k8s-manifest-sigstore/pkg/util"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -112,7 +113,7 @@ func GetProvenanceFromVerifyResourceResult(res VerifyResult) ObservationResource
 	}
 
 	for _, pr := range res.Provenances {
-		if pr.ArtifactType != k8smnfutil.ArtifactManifestImage {
+		if pr.ArtifactType != k8smanifest.ArtifactManifestImage {
 			log.Debug("ArtifactType is not manifestImage:", pr.ArtifactType)
 			continue
 		}
@@ -299,7 +300,7 @@ func getParentsFromDetail(body []byte) []Parent {
 	return result
 }
 
-func getCommitID(digest k8smnfutil.DigestSet) string {
+func getCommitID(digest k8smanifest.DigestSet) string {
 	if val, ok := digest["commit"]; ok {
 		return val
 	}

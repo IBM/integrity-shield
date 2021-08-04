@@ -51,6 +51,7 @@ type RequestHandlerConfig struct {
 	SigStoreConfig          SigStoreConfig          `json:"sigStoreConfig,omitempty"`
 	RequestFilterProfile    RequestFilterProfile    `json:"requestFilterProfile,omitempty"`
 	Log                     LogConfig               `json:"log,omitempty"`
+	SideEffectConfig        SideEffectConfig        `json:"sideEffect,omitempty"`
 	Options                 []string
 }
 
@@ -58,6 +59,11 @@ type LogConfig struct {
 	Level                    string `json:"level,omitempty"`
 	ManifestSigstoreLogLevel string `json:"manifestSigstoreLogLevel,omitempty"`
 	Format                   string `json:"format,omitempty"`
+}
+
+type SideEffectConfig struct {
+	// Event
+	CreateDenyEvent bool `json:"createDenyEvent"`
 }
 
 type ImageVerificationConfig struct {

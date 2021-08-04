@@ -6,16 +6,16 @@ require (
 	github.com/ghodss/yaml v1.0.0
 	github.com/in-toto/in-toto-golang v0.2.1-0.20210627200632-886210ae2ab9
 	github.com/pkg/errors v0.9.1
-	github.com/sigstore/k8s-manifest-sigstore v0.0.0-20210714051241-720a2b835e9b
+	github.com/sigstore/k8s-manifest-sigstore v0.0.0-20210730144819-a9407f0b5806
 	github.com/sirupsen/logrus v1.8.1
-	k8s.io/api v0.21.2
-	k8s.io/apimachinery v0.21.2
-	k8s.io/client-go v0.21.2
+	k8s.io/api v0.21.3
+	k8s.io/apimachinery v0.21.3
+	k8s.io/client-go v0.21.3
 )
 
 replace (
 	github.com/IBM/integrity-shield/observer => ./
-	github.com/sigstore/k8s-manifest-sigstore => github.com/hirokuni-kitahara/k8s-manifest-sigstore v0.0.0-20210721161334-a660ba327f37
+	github.com/sigstore/k8s-manifest-sigstore => github.com/hirokuni-kitahara/k8s-manifest-sigstore v0.0.0-20210804055016-a9c8be268175
 	k8s.io/api => k8s.io/api v0.19.0
 	k8s.io/apimachinery => k8s.io/apimachinery v0.19.0
 	k8s.io/cli-runtime => k8s.io/cli-runtime v0.19.0

@@ -9,6 +9,7 @@ require (
 	github.com/onsi/gomega v1.13.0
 	github.com/open-policy-agent/frameworks/constraint v0.0.0-20210714212123-82a32eecb70d
 	github.com/openshift/api v3.9.0+incompatible
+	github.com/sigstore/cosign v1.0.1 // indirect
 	k8s.io/api v0.21.3
 	k8s.io/apiextensions-apiserver v0.21.1
 	k8s.io/apimachinery v0.21.3

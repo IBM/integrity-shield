@@ -43,8 +43,10 @@ export $(shell sed 's/=.*//' $(ENV_CONFIG))
 
 ifeq ($(ISHIELD_ENV), remote)
 OPERATOR_IMG=$(ISHIELD_OPERATOR_IMAGE_NAME_AND_VERSION)
+CR=apis_v1alpha1_integrityshield.yaml
 else
 OPERATOR_IMG=$(TEST_ISHIELD_OPERATOR_IMAGE_NAME_AND_VERSION)
+CR=apis_v1alpha1_integrityshield_local.yaml
 endif
 
 # COPYRIGHT
@@ -74,7 +76,7 @@ deploy-op:
 	cd $(SHIELD_OP_DIR) && make deploy IMG=$(OPERATOR_IMG)
 
 deploy-cr-gk:
-	kubectl create -f $(SHIELD_OP_DIR)config/samples/apis_v1alpha1_integrityshield.yaml -n $(ISHIELD_NS)
+	kubectl create -f $(SHIELD_OP_DIR)config/samples/$(CR) -n $(ISHIELD_NS)
 
 deploy-cr-ac:
 	kubectl create -f $(SHIELD_OP_DIR)config/samples/apis_v1alpha1_integrityshield_ac.yaml -n $(ISHIELD_NS)
@@ -84,7 +86,7 @@ delete-op:
 	cd $(SHIELD_OP_DIR) && make undeploy
 
 delete-cr-gk:
-	kubectl delete -f $(SHIELD_OP_DIR)config/samples/apis_v1alpha1_integrityshield.yaml -n $(ISHIELD_NS)
+	kubectl delete -f $(SHIELD_OP_DIR)config/samples/$(CR) -n $(ISHIELD_NS)
 
 delete-cr-ac:
 	kubectl delete -f $(SHIELD_OP_DIR)config/samples/apis_v1alpha1_integrityshield_ac.yaml -n $(ISHIELD_NS)

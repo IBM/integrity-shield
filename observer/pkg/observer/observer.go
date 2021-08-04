@@ -31,7 +31,6 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 	"github.com/sigstore/k8s-manifest-sigstore/pkg/k8smanifest"
-	k8smnfutil "github.com/sigstore/k8s-manifest-sigstore/pkg/util"
 	"github.com/sigstore/k8s-manifest-sigstore/pkg/util/kubeutil"
 	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
@@ -72,7 +71,7 @@ type VerifyResult struct {
 	Result      string                    `json:"result"`
 	Verified    bool                      `json:"verified"`
 	SigRef      string                    `json:"sigRef"`
-	Provenances []*k8smnfutil.Provenance  `json:"provenances"`
+	Provenances []*k8smanifest.Provenance `json:"provenances"`
 }
 
 type FinalObservationResourceResult struct {
