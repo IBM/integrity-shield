@@ -31,6 +31,7 @@ type ParameterObject struct {
 	SkipUsers                        ObjectUserBindingList           `json:"skipUsers,omitempty"`
 	TargetServiceAccount             []string                        `json:"targetServiceAccount,omitempty"`
 	ImageProfile                     ImageProfile                    `json:"imageProfile,omitempty"`
+	ConstraintName                   string                          `json:"constraintName,omitempty"`
 }
 
 type KeyConfig struct {

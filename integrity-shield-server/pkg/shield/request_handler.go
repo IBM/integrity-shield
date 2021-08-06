@@ -92,6 +92,14 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 		"userName":  req.UserInfo.Username,
 	}).Debug("Process new request")
 
+	log.WithFields(log.Fields{
+		"namespace": req.Namespace,
+		"name":      req.Name,
+		"kind":      req.Kind.Kind,
+		"operation": req.Operation,
+		"userName":  req.UserInfo.Username,
+	}).Debug("Parameter", paramObj)
+
 	commonSkipUserMatched := false
 	skipObjectMatched := false
 	if rhconfig != nil {
@@ -182,7 +190,7 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 
 	// generate events
 	if rhconfig.SideEffectConfig.CreateDenyEvent {
-		_ = createOrUpdateEvent(req, r)
+		_ = createOrUpdateEvent(req, r, paramObj.ConstraintName)
 	}
 
 	// log
@@ -347,7 +355,7 @@ func skipObjectsMatch(l k8smanifest.ObjectReferenceList, obj unstructured.Unstru
 	return false
 }
 
-func createOrUpdateEvent(req admission.Request, ar *ResultFromRequestHandler) error {
+func createOrUpdateEvent(req admission.Request, ar *ResultFromRequestHandler, constraintName string) error {
 	// no event is generated for allowed request
 	if ar.Allow {
 		return nil
@@ -405,8 +413,8 @@ func createOrUpdateEvent(req admission.Request, ar *ResultFromRequestHandler) er
 		evt = current
 	}
 
-	// tmpMessage := "[" + constraintName + "]" + ar.Message
-	tmpMessage := ar.Message
+	tmpMessage := "[" + constraintName + "]" + ar.Message
+	// tmpMessage := ar.Message
 	// Event.Message can have 1024 chars at most
 	if len(tmpMessage) > 1024 {
 		tmpMessage = tmpMessage[:950] + " ... Trimmed. `Event.Message` can have 1024 chars at maximum."
