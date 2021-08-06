@@ -25,7 +25,7 @@ import (
 )
 
 //sa
-func BuildServiceAccountForIShieldApi(cr *apiv1alpha1.IntegrityShield) *corev1.ServiceAccount {
+func BuildServiceAccountForIShield(cr *apiv1alpha1.IntegrityShield) *corev1.ServiceAccount {
 	labels := map[string]string{
 		"app":                          cr.Name,
 		"app.kubernetes.io/name":       cr.Name,
@@ -35,23 +35,6 @@ func BuildServiceAccountForIShieldApi(cr *apiv1alpha1.IntegrityShield) *corev1.S
 	sa := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cr.Spec.Security.ServerServiceAccountName,
-			Namespace: cr.Namespace,
-			Labels:    labels,
-		},
-	}
-	return sa
-}
-
-func BuildServiceAccountForIShieldController(cr *apiv1alpha1.IntegrityShield) *corev1.ServiceAccount {
-	labels := map[string]string{
-		"app":                          cr.Name,
-		"app.kubernetes.io/name":       cr.Name,
-		"app.kubernetes.io/managed-by": "operator",
-		"role":                         "security",
-	}
-	sa := &corev1.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      cr.Spec.Security.ACServiceAccountName,
 			Namespace: cr.Namespace,
 			Labels:    labels,
 		},
@@ -76,7 +59,7 @@ func BuildServiceAccountForObserver(cr *apiv1alpha1.IntegrityShield) *corev1.Ser
 	return sa
 }
 
-//cluster role
+//cluster role - server
 func BuildClusterRoleForIShield(cr *apiv1alpha1.IntegrityShield) *rbacv1.ClusterRole {
 	labels := map[string]string{
 		"app":                          cr.Name,
@@ -86,44 +69,33 @@ func BuildClusterRoleForIShield(cr *apiv1alpha1.IntegrityShield) *rbacv1.Cluster
 	}
 	role := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      cr.Spec.Security.ACClusterRole,
+			Name:      cr.Spec.Security.ServerRole,
 			Namespace: cr.Namespace,
 			Labels:    labels,
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
 				APIGroups: []string{
-					"*",
+					"", "apis.integrityshield.io",
 				},
 				Resources: []string{
-					"*",
+					"secrets", "manifestintegrityprofiles",
 				},
 				Verbs: []string{
-					"get", "list", "create", "update",
+					"get", "list", "watch", "patch", "update",
 				},
 			},
-			// {
-			// 	APIGroups: []string{
-			// 		"extensions", "", "apis.integrityshield.io",
-			// 	},
-			// 	Resources: []string{
-			// 		"secrets", "namespaces", " manifestintegrityprofiles",
-			// 	},
-			// 	Verbs: []string{
-			// 		"get", "list", "watch", "patch", "update",
-			// 	},
-			// },
-			// {
-			// 	APIGroups: []string{
-			// 		"",
-			// 	},
-			// 	Resources: []string{
-			// 		"events",
-			// 	},
-			// 	Verbs: []string{
-			// 		"create", "update", "get", "patch",
-			// 	},
-			// },
+			{
+				APIGroups: []string{
+					"",
+				},
+				Resources: []string{
+					"events",
+				},
+				Verbs: []string{
+					"create", "update", "get",
+				},
+			},
 			// {
 			// 	APIGroups: []string{
 			// 		"apiextensions.k8s.io",
@@ -135,15 +107,29 @@ func BuildClusterRoleForIShield(cr *apiv1alpha1.IntegrityShield) *rbacv1.Cluster
 			// 		"get", "list", "create", "update",
 			// 	},
 			// },
+			{
+				APIGroups: []string{
+					"*",
+				},
+				Resources: []string{
+					"*",
+				},
+				Verbs: []string{
+					"get", "list",
+				},
+			},
 			// {
 			// 	APIGroups: []string{
-			// 		"*",
+			// 		"extensions",
 			// 	},
 			// 	Resources: []string{
-			// 		"*",
+			// 		"podsecuritypolicies",
 			// 	},
 			// 	Verbs: []string{
-			// 		"get", "list",
+			// 		"use",
+			// 	},
+			// 	ResourceNames: []string{
+			// 		cr.Spec.Security.PodSecurityPolicyName,
 			// 	},
 			// },
 		},
@@ -161,36 +147,35 @@ func BuildClusterRoleBindingForIShield(cr *apiv1alpha1.IntegrityShield) *rbacv1.
 	}
 	rolebinding := &rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      cr.Spec.Security.ACClusterRoleBinding,
+			Name:      cr.Spec.Security.ServerRoleBinding,
 			Namespace: cr.Namespace,
 			Labels:    labels,
 		},
 		Subjects: []rbacv1.Subject{
 			{
 				Kind:      "ServiceAccount",
-				Name:      cr.Spec.Security.ACServiceAccountName,
+				Name:      cr.Spec.Security.ServerServiceAccountName,
 				Namespace: cr.Namespace,
 			},
 		},
 		RoleRef: rbacv1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "ClusterRole",
-			Name:     cr.Spec.Security.ACClusterRole,
+			Name:     cr.Spec.Security.ServerRole,
 		},
 	}
 	return rolebinding
 }
 
-//role
-// Todo: change to Role
-func BuildRoleForIShield(cr *apiv1alpha1.IntegrityShield) *rbacv1.ClusterRole {
+//role dry-run
+func BuildRoleForIShield(cr *apiv1alpha1.IntegrityShield) *rbacv1.Role {
 	labels := map[string]string{
 		"app":                          cr.Name,
 		"app.kubernetes.io/name":       cr.Name,
 		"app.kubernetes.io/managed-by": "operator",
 		"role":                         "security",
 	}
-	role := &rbacv1.ClusterRole{
+	role := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cr.Spec.Security.ServerRole,
 			Namespace: cr.Namespace,
@@ -235,7 +220,7 @@ func BuildClusterRoleForObserver(cr *apiv1alpha1.IntegrityShield) *rbacv1.Cluste
 					"*",
 				},
 				Verbs: []string{
-					"get", "list", "create", "update",
+					"get", "list",
 				},
 			},
 		},
@@ -244,14 +229,14 @@ func BuildClusterRoleForObserver(cr *apiv1alpha1.IntegrityShield) *rbacv1.Cluste
 }
 
 //role-binding
-func BuildRoleBindingForIShield(cr *apiv1alpha1.IntegrityShield) *rbacv1.ClusterRoleBinding {
+func BuildRoleBindingForIShield(cr *apiv1alpha1.IntegrityShield) *rbacv1.RoleBinding {
 	labels := map[string]string{
 		"app":                          cr.Name,
 		"app.kubernetes.io/name":       cr.Name,
 		"app.kubernetes.io/managed-by": "operator",
 		"role":                         "security",
 	}
-	rolebinding := &rbacv1.ClusterRoleBinding{
+	rolebinding := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cr.Spec.Security.ServerRoleBinding,
 			Namespace: cr.Namespace,
@@ -266,7 +251,7 @@ func BuildRoleBindingForIShield(cr *apiv1alpha1.IntegrityShield) *rbacv1.Cluster
 		},
 		RoleRef: rbacv1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
-			Kind:     "ClusterRole",
+			Kind:     "Role",
 			Name:     cr.Spec.Security.ServerRole,
 		},
 	}

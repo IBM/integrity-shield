@@ -259,7 +259,7 @@ func BuildDeploymentForAdmissionController(cr *apiv1alpha1.IntegrityShield) *app
 					Labels: cr.Spec.ControllerContainer.SelectorLabels,
 				},
 				Spec: v1.PodSpec{
-					ServiceAccountName: cr.Spec.Security.ACServiceAccountName,
+					ServiceAccountName: cr.Spec.Security.ServerServiceAccountName,
 					SecurityContext:    cr.Spec.Security.PodSecurityContext,
 					Containers:         containers,
 					NodeSelector:       cr.Spec.NodeSelector,

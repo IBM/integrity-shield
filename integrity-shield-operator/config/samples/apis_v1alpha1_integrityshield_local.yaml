@@ -10,9 +10,9 @@ spec:
     app: ishield-server
   affinity: {}
   security:
-    serverServiceAccountName: integrity-shield-sa
-    shieldApiRole: integrity-shield-role
-    shieldApiRoleBinding: integrity-shield-rolebinding
+    serviceAccountName: integrity-shield-sa
+    role: integrity-shield-role
+    roleBinding: integrity-shield-rolebinding
     podSecurityPolicyName: integrity-shield-psp
     observerServiceAccountName: integrity-shield-observer-sa
     observerRole: integrity-shield-observer-role

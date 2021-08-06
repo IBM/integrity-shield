@@ -488,14 +488,7 @@ func (r *IntegrityShieldReconciler) createOrUpdateRoleBinding(instance *apiv1alp
 // api sa
 func (r *IntegrityShieldReconciler) createOrUpdateIShieldApiServiceAccount(
 	instance *apiv1alpha1.IntegrityShield) (ctrl.Result, error) {
-	expected := res.BuildServiceAccountForIShieldApi(instance)
-	return r.createOrUpdateServiceAccount(instance, expected)
-}
-
-// ac sa
-func (r *IntegrityShieldReconciler) createOrUpdateIShieldControllerServiceAccount(
-	instance *apiv1alpha1.IntegrityShield) (ctrl.Result, error) {
-	expected := res.BuildServiceAccountForIShieldController(instance)
+	expected := res.BuildServiceAccountForIShield(instance)
 	return r.createOrUpdateServiceAccount(instance, expected)
 }
 
@@ -506,7 +499,7 @@ func (r *IntegrityShieldReconciler) createOrUpdateObserverServiceAccount(
 	return r.createOrUpdateServiceAccount(instance, expected)
 }
 
-// cluster role binding for ac sa
+// cluster role binding
 func (r *IntegrityShieldReconciler) createOrUpdateClusterRoleBindingForIShield(
 	instance *apiv1alpha1.IntegrityShield) (ctrl.Result, error) {
 	expected := res.BuildClusterRoleBindingForIShield(instance)
@@ -532,7 +525,7 @@ func (r *IntegrityShieldReconciler) deleteObserverClusterRoleBindingForIShield(
 	return r.deleteClusterRoleBinding(instance, expected)
 }
 
-// cluster role for ac sa
+// cluster role
 func (r *IntegrityShieldReconciler) createOrUpdateClusterRoleForIShield(
 	instance *apiv1alpha1.IntegrityShield) (ctrl.Result, error) {
 	expected := res.BuildClusterRoleForIShield(instance)
@@ -558,29 +551,18 @@ func (r *IntegrityShieldReconciler) deleteObserverClusterRoleForIShield(
 	return r.deleteClusterRole(instance, expected)
 }
 
-// role binding for api sa
-// TODO: change to role
+// role binding
 func (r *IntegrityShieldReconciler) createOrUpdateRoleBindingForIShield(
 	instance *apiv1alpha1.IntegrityShield) (ctrl.Result, error) {
 	expected := res.BuildRoleBindingForIShield(instance)
-	return r.createOrUpdateClusterRoleBinding(instance, expected)
-}
-func (r *IntegrityShieldReconciler) deleteRoleBindingForIShield(
-	instance *apiv1alpha1.IntegrityShield) (ctrl.Result, error) {
-	expected := res.BuildRoleBindingForIShield(instance)
-	return r.deleteClusterRoleBinding(instance, expected)
+	return r.createOrUpdateRoleBinding(instance, expected)
 }
 
-// role for api sa
+// role
 func (r *IntegrityShieldReconciler) createOrUpdateRoleForIShield(
 	instance *apiv1alpha1.IntegrityShield) (ctrl.Result, error) {
 	expected := res.BuildRoleForIShield(instance)
-	return r.createOrUpdateClusterRole(instance, expected)
-}
-func (r *IntegrityShieldReconciler) deleteRoleForIShield(
-	instance *apiv1alpha1.IntegrityShield) (ctrl.Result, error) {
-	expected := res.BuildRoleForIShield(instance)
-	return r.deleteClusterRole(instance, expected)
+	return r.createOrUpdateRole(instance, expected)
 }
 
 func (r *IntegrityShieldReconciler) createOrUpdatePodSecurityPolicy(instance *apiv1alpha1.IntegrityShield) (ctrl.Result, error) {
@@ -1049,7 +1031,7 @@ func (r *IntegrityShieldReconciler) createOrUpdateWebhookEvent(instance *apiv1al
 		found.EventTime = metav1.NewMicroTime(now)
 		found.LastTimestamp = metav1.NewTime(now)
 		found.Message = msg
-		found.Reason = msg
+		found.Reason = reason
 		found.ReportingController = evtSourceName
 		found.ReportingInstance = evtName
 

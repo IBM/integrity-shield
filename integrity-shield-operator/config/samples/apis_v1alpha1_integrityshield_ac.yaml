@@ -8,10 +8,13 @@ spec:
   # Add fields here
   affinity: {}
   security:
-    admissionControllerServiceAccountName: integrity-shield-validator
-    admissionControllerClusterRole: integrity-shield-validator-role
-    admissionControllerClusterRoleBinding: integrity-shield-validator-rolebinding
+    serviceAccountName: integrity-shield-sa
+    role: integrity-shield-role
+    roleBinding: integrity-shield-rolebinding
     podSecurityPolicyName: integrity-shield-psp
+    observerServiceAccountName: integrity-shield-observer-sa
+    observerRole: integrity-shield-observer-role
+    observerRoleBinding: integrity-shield-observer-rolebinding
     securityContext: {}
   requestHandlerConfigKey: config.yaml
   requestHandlerConfigName: request-handler-config
@@ -233,7 +236,7 @@ spec:
   admissionController: 
     name: integrity-shield-validator
     imagePullPolicy: Always
-    image: localhost:5000/k8s-manifest-integrity-shield-admission-controller:0.1.0
+    image: localhost:5000/integrity-shield-admission-controller:0.2.0
     port: 9443
     log: 
       level: inform
@@ -345,7 +348,7 @@ spec:
     enabled: false
     name: integrity-shield-observer
     imagePullPolicy: Always
-    image: localhost:5000/k8s-manifest-integrity-shield-observer:0.1.0
+    image: localhost:5000/integrity-shield-observer:0.2.0
     selector:     
       app: integrity-shield-observer
     logLevel: info

@@ -18,6 +18,7 @@ package observer
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/sigstore/k8s-manifest-sigstore/pkg/k8smanifest"
@@ -33,18 +34,11 @@ func InspectResources(resources []unstructured.Unstructured, ignoreFields k8sman
 		vo.IgnoreFields = ignoreFields
 		vo.CheckDryRunForApply = true
 		vo.Provenance = true
-		// annotations := resource.GetAnnotations()
-		// annoImageRef, found := annotations[ImageRefAnnotationKey]
-		// if found {
-		// 	vo.ImageRef = annoImageRef
-		// } else {
-		// 	results = append(results, VerifyResult{
-		// 		Resource: resource,
-		// 		Result:   "no signature found",
-		// 		Verified: false,
-		// 	})
-		// 	continue
-		// }
+		namespace := os.Getenv("POD_NAMESPACE")
+		if namespace == "" {
+			namespace = defaultPodNamespace
+		}
+		vo.DryRunNamespace = namespace
 
 		// secret
 		for _, s := range secrets {

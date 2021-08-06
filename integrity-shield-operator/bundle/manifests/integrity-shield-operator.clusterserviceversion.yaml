@@ -41,10 +41,10 @@ metadata:
               "observerRoleBinding": "integrity-shield-observer-rolebinding",
               "observerServiceAccountName": "integrity-shield-observer-sa",
               "podSecurityPolicyName": "integrity-shield-psp",
+              "role": "integrity-shield-role",
+              "roleBinding": "integrity-shield-rolebinding",
               "securityContext": {},
-              "serverServiceAccountName": "integrity-shield-sa",
-              "shieldApiRole": "integrity-shield-role",
-              "shieldApiRoleBinding": "integrity-shield-rolebinding"
+              "serviceAccountName": "integrity-shield-sa"
             },
             "shieldApi": {
               "image": "gcr.io/clean-resource-318209/integrity-shield-server:0.2.0",

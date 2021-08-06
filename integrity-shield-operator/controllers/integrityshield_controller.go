@@ -112,6 +112,34 @@ func (r *IntegrityShieldReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if recErr != nil || recResult.Requeue {
 		return recResult, recErr
 	}
+	//Service Account
+	recResult, recErr = r.createOrUpdateIShieldApiServiceAccount(instance)
+	if recErr != nil || recResult.Requeue {
+		return recResult, recErr
+	}
+
+	//Role
+	recResult, recErr = r.createOrUpdateRoleForIShield(instance)
+	if recErr != nil || recResult.Requeue {
+		return recResult, recErr
+	}
+
+	//Role Binding
+	recResult, recErr = r.createOrUpdateRoleBindingForIShield(instance)
+	if recErr != nil || recResult.Requeue {
+		return recResult, recErr
+	}
+
+	//Cluster Role
+	recResult, recErr = r.createOrUpdateClusterRoleForIShield(instance)
+	if recErr != nil || recResult.Requeue {
+		return recResult, recErr
+	}
+	//Cluster Role Binding
+	recResult, recErr = r.createOrUpdateClusterRoleBindingForIShield(instance)
+	if recErr != nil || recResult.Requeue {
+		return recResult, recErr
+	}
 
 	// Observer
 	if instance.Spec.Observer.Enabled {
@@ -139,23 +167,6 @@ func (r *IntegrityShieldReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	// Gatekeeper
 	if instance.Spec.UseGatekeeper {
-		//Service Account
-		recResult, recErr = r.createOrUpdateIShieldApiServiceAccount(instance)
-		if recErr != nil || recResult.Requeue {
-			return recResult, recErr
-		}
-
-		//Role
-		recResult, recErr = r.createOrUpdateRoleForIShield(instance)
-		if recErr != nil || recResult.Requeue {
-			return recResult, recErr
-		}
-
-		//Role Binding
-		recResult, recErr = r.createOrUpdateRoleBindingForIShield(instance)
-		if recErr != nil || recResult.Requeue {
-			return recResult, recErr
-		}
 
 		// Shield API Secret
 		recResult, recErr = r.createOrUpdateTlsSecret(instance)
@@ -195,21 +206,7 @@ func (r *IntegrityShieldReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		if recErr != nil || recResult.Requeue {
 			return recResult, recErr
 		}
-		//Service Account
-		recResult, recErr = r.createOrUpdateIShieldControllerServiceAccount(instance)
-		if recErr != nil || recResult.Requeue {
-			return recResult, recErr
-		}
-		//Cluster Role
-		recResult, recErr = r.createOrUpdateClusterRoleForIShield(instance)
-		if recErr != nil || recResult.Requeue {
-			return recResult, recErr
-		}
-		//Cluster Role Binding
-		recResult, recErr = r.createOrUpdateClusterRoleBindingForIShield(instance)
-		if recErr != nil || recResult.Requeue {
-			return recResult, recErr
-		}
+
 		// webhook secret
 		recResult, recErr = r.createOrUpdateACTlsSecret(instance)
 		if recErr != nil || recResult.Requeue {
@@ -260,33 +257,25 @@ func (r *IntegrityShieldReconciler) deleteClusterScopedChildrenResources(instanc
 	// delete any cluster scope resources owned by the instance
 	// (In Iubernetes 1.20 and later, a garbage collector ignore cluster scope children even if their owner is deleted)
 	var err error
+
+	//Cluster Role
+	_, err = r.deleteClusterRoleForIShield(instance)
+	if err != nil {
+		return err
+	}
+	//Cluster Role Binding
+	_, err = r.deleteClusterRoleBindingForIShield(instance)
+	if err != nil {
+		return err
+	}
+
 	if instance.Spec.UseGatekeeper {
-		// rolebinding for api sa
-		// TODO: will be removed after fix role/rolebinding
-		_, err = r.deleteRoleBindingForIShield(instance)
-		if err != nil {
-			return err
-		}
-		_, err = r.deleteRoleForIShield(instance)
-		if err != nil {
-			return err
-		}
 		_, err = r.deleteConstraintTemplate(instance)
 		if err != nil {
 			return err
 		}
 	} else {
 		_, err = r.deleteWebhook(instance)
-		if err != nil {
-			return err
-		}
-		//Cluster Role
-		_, err = r.deleteClusterRoleForIShield(instance)
-		if err != nil {
-			return err
-		}
-		//Cluster Role Binding
-		_, err = r.deleteClusterRoleBindingForIShield(instance)
 		if err != nil {
 			return err
 		}

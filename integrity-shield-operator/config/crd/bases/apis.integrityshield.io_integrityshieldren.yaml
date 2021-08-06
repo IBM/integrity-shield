@@ -1041,12 +1041,6 @@ spec:
                 type: string
               security:
                 properties:
-                  admissionControllerClusterRole:
-                    type: string
-                  admissionControllerClusterRoleBinding:
-                    type: string
-                  admissionControllerServiceAccountName:
-                    type: string
                   observerRole:
                     type: string
                   observerRoleBinding:
@@ -1054,6 +1048,10 @@ spec:
                   observerServiceAccountName:
                     type: string
                   podSecurityPolicyName:
+                    type: string
+                  role:
+                    type: string
+                  roleBinding:
                     type: string
                   securityContext:
                     description: PodSecurityContext holds pod-level security attributes
@@ -1205,11 +1203,7 @@ spec:
                             type: string
                         type: object
                     type: object
-                  serverServiceAccountName:
-                    type: string
-                  shieldApiRole:
-                    type: string
-                  shieldApiRoleBinding:
+                  serviceAccountName:
                     type: string
                 type: object
               shieldApi:

@@ -97,15 +97,12 @@ type ControllerContainer struct {
 }
 
 type SecurityConfig struct {
-	ServerServiceAccountName   string                 `json:"serverServiceAccountName,omitempty"`
-	ACServiceAccountName       string                 `json:"admissionControllerServiceAccountName,omitempty"`
+	ServerServiceAccountName   string                 `json:"serviceAccountName,omitempty"`
 	ObserverServiceAccountName string                 `json:"observerServiceAccountName,omitempty"`
 	ObserverRole               string                 `json:"observerRole,omitempty"`
 	ObserverRoleBinding        string                 `json:"observerRoleBinding,omitempty"`
-	ServerRole                 string                 `json:"shieldApiRole,omitempty"`
-	ServerRoleBinding          string                 `json:"shieldApiRoleBinding,omitempty"`
-	ACClusterRole              string                 `json:"admissionControllerClusterRole,omitempty"`
-	ACClusterRoleBinding       string                 `json:"admissionControllerClusterRoleBinding,omitempty"`
+	ServerRole                 string                 `json:"role,omitempty"`
+	ServerRoleBinding          string                 `json:"roleBinding,omitempty"`
 	PodSecurityPolicyName      string                 `json:"podSecurityPolicyName,omitempty"`
 	PodSecurityContext         *v1.PodSecurityContext `json:"securityContext,omitempty"`
 	// AutoIShieldAdminCreationDisabled bool                   `json:"autoIShieldAdminRoleCreationDisabled,omitempty"`

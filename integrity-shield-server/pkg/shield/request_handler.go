@@ -50,6 +50,8 @@ const defaultHandlerConfigMapName = "request-handler-config"
 
 const (
 	EventTypeAnnotationKey       = "integrityshield.io/eventType"
+	EventResultAnnotationKey     = "integrityshield.io/eventResult"
+	EventTypeValueVerifyResult   = "verify-result"
 	EventTypeAnnotationValueDeny = "deny"
 )
 
@@ -158,11 +160,22 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 			"userName":  req.UserInfo.Username,
 		}).Debug("VerifyResource result: ", result)
 		if err != nil {
-			log.Warning("Signature verification is required for this request, but verifyResource return error ; %s", err.Error())
-			return &ResultFromRequestHandler{
+			log.WithFields(log.Fields{
+				"namespace": req.Namespace,
+				"name":      req.Name,
+				"kind":      req.Kind.Kind,
+				"operation": req.Operation,
+				"userName":  req.UserInfo.Username,
+			}).Warning("Signature verification is required for this request, but verifyResource return error ; %s", err.Error())
+			r := &ResultFromRequestHandler{
 				Allow:   false,
 				Message: err.Error(),
 			}
+			// generate events
+			if rhconfig.SideEffectConfig.CreateDenyEvent {
+				_ = createOrUpdateEvent(req, r, paramObj.ConstraintName)
+			}
+			return r
 		}
 		if result.InScope {
 			if result.Verified {
@@ -275,6 +288,11 @@ func setVerifyOption(paramObj *k8smnfconfig.ParameterObject, config *k8smnfconfi
 	vo := &paramObj.VerifyResourceOption
 	vo.CheckDryRunForApply = true
 	vo.ImageRef = paramObj.ImageRef
+	namespace := os.Getenv("POD_NAMESPACE")
+	if namespace == "" {
+		namespace = defaultPodNamespace
+	}
+	vo.DryRunNamespace = namespace
 	// prepare local key for verifyResource
 	if len(paramObj.KeyConfigs) != 0 {
 		keyPathList := []string{}
@@ -394,7 +412,8 @@ func createOrUpdateEvent(req admission.Request, ar *ResultFromRequestHandler, co
 			Name:      evtName,
 			Namespace: evtNamespace,
 			Annotations: map[string]string{
-				EventTypeAnnotationKey: EventTypeAnnotationValueDeny,
+				EventTypeAnnotationKey:   EventTypeValueVerifyResult,
+				EventResultAnnotationKey: EventTypeAnnotationValueDeny,
 			},
 		},
 		InvolvedObject:      involvedObject,
