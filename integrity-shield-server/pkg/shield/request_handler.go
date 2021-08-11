@@ -43,7 +43,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-const remoteRequestHandlerURL = "https://integrity-shield-api.k8s-manifest-sigstore.svc:8123/api/request"
 const defaultConfigKeyInConfigMap = "config.yaml"
 const defaultPodNamespace = "k8s-manifest-sigstore"
 const defaultHandlerConfigMapName = "request-handler-config"
@@ -63,9 +62,10 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 	err := json.Unmarshal(objectBytes, &resource)
 	if err != nil {
 		log.Errorf("failed to Unmarshal a requested object into %T; %s", resource, err.Error())
+		errMsg := "IntegrityShield failed to decide the response. Failed to Unmarshal a requested object: " + err.Error()
 		return &ResultFromRequestHandler{
-			Allow:   true,
-			Message: "error but allow for development",
+			Allow:   false,
+			Message: errMsg,
 		}
 	}
 
@@ -73,9 +73,10 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 	rhconfig, err := loadRequestHandlerConfig()
 	if err != nil {
 		log.Errorf("failed to load request handler config", err.Error())
+		errMsg := "IntegrityShield failed to decide the response. Failed to load request handler config: " + err.Error()
 		return &ResultFromRequestHandler{
-			Allow:   true,
-			Message: "error but allow for development",
+			Allow:   false,
+			Message: errMsg,
 		}
 	}
 	if rhconfig == nil {
@@ -124,9 +125,10 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 		mutated, err := mutationCheck(req.AdmissionRequest.OldObject.Raw, req.AdmissionRequest.Object.Raw, ignoreFields)
 		if err != nil {
 			log.Errorf("failed to check mutation", err.Error())
+			errMsg := "IntegrityShield failed to decide the response. Failed to check mutation: " + err.Error()
 			return &ResultFromRequestHandler{
-				Allow:   true,
-				Message: "error but allow for development",
+				Allow:   false,
+				Message: errMsg,
 			}
 		}
 		if !mutated {
@@ -141,13 +143,13 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 	message := ""
 	if skipUserMatched || commonSkipUserMatched {
 		allow = true
-		message = "ignore user config matched"
+		message = "SkipUsers rule matched."
 	} else if !inScopeObjMatched {
 		allow = true
-		message = "this resource is not in scope of verification"
+		message = "InScopeObjects rule did not match. Out of scope of verification."
 	} else if skipObjectMatched {
 		allow = true
-		message = "verification of this resource is skipped"
+		message = "SkipObjects rule matched."
 	} else {
 		vo := setVerifyOption(paramObj, rhconfig)
 		// call VerifyResource with resource, verifyOption, keypath, imageRef
