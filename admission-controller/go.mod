@@ -18,7 +18,7 @@ require (
 replace (
 	github.com/IBM/integrity-shield/admission-controller => ./
 	github.com/IBM/integrity-shield/integrity-shield-server => ../integrity-shield-server
-	github.com/sigstore/k8s-manifest-sigstore => github.com/hirokuni-kitahara/k8s-manifest-sigstore v0.0.0-20210806062140-d8c27c508ade
+	github.com/sigstore/k8s-manifest-sigstore => github.com/hirokuni-kitahara/k8s-manifest-sigstore v0.0.0-20210812064243-c15355c2b1a9
 	k8s.io/api => k8s.io/api v0.19.0
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.19.0
 	k8s.io/apimachinery => k8s.io/apimachinery v0.19.0
