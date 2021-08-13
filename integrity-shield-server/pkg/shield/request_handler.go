@@ -46,7 +46,9 @@ import (
 const defaultConfigKeyInConfigMap = "config.yaml"
 const defaultPodNamespace = "k8s-manifest-sigstore"
 const defaultHandlerConfigMapName = "request-handler-config"
-
+const ImageRefAnnotationKeyShield = "integrityshield.io/signature"
+const AnnotationKeyDomain = "integrityshield.io"
+const SignatureAnnotationTypeShield = "IntegrityShield"
 const (
 	EventTypeAnnotationKey       = "integrityshield.io/eventType"
 	EventResultAnnotationKey     = "integrityshield.io/eventResult"
@@ -151,7 +153,13 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 		allow = true
 		message = "SkipObjects rule matched."
 	} else {
-		vo := setVerifyOption(paramObj, rhconfig)
+		var signatureAnnotationType string
+		annotations := resource.GetAnnotations()
+		_, found := annotations[ImageRefAnnotationKeyShield]
+		if found {
+			signatureAnnotationType = SignatureAnnotationTypeShield
+		}
+		vo := setVerifyOption(paramObj, rhconfig, signatureAnnotationType)
 		// call VerifyResource with resource, verifyOption, keypath, imageRef
 		result, err := k8smanifest.VerifyResource(resource, vo)
 		log.WithFields(log.Fields{
@@ -285,7 +293,7 @@ func mutationCheck(rawOldObject, rawObject []byte, IgnoreFields []string) (bool,
 	return true, nil
 }
 
-func setVerifyOption(paramObj *k8smnfconfig.ParameterObject, config *k8smnfconfig.RequestHandlerConfig) *k8smanifest.VerifyResourceOption {
+func setVerifyOption(paramObj *k8smnfconfig.ParameterObject, config *k8smnfconfig.RequestHandlerConfig, signatureAnnotationType string) *k8smanifest.VerifyResourceOption {
 	// get verifyOption and imageRef from Parameter
 	vo := &paramObj.VerifyResourceOption
 	vo.CheckDryRunForApply = true
@@ -295,6 +303,9 @@ func setVerifyOption(paramObj *k8smnfconfig.ParameterObject, config *k8smnfconfi
 		namespace = defaultPodNamespace
 	}
 	vo.DryRunNamespace = namespace
+	if signatureAnnotationType == SignatureAnnotationTypeShield {
+		vo.AnnotationConfig.AnnotationKeyDomain = AnnotationKeyDomain
+	}
 	// prepare local key for verifyResource
 	if len(paramObj.KeyConfigs) != 0 {
 		keyPathList := []string{}

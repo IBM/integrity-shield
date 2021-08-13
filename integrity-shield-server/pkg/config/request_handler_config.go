@@ -83,19 +83,19 @@ func SetupLogger(config LogConfig, req admission.Request) {
 	k8sLogLevelStr := config.ManifestSigstoreLogLevel
 	if logLevelStr == "" && k8sLogLevelStr == "" {
 		logLevelStr = "info"
-		os.Setenv(k8sLogLevelEnvKey, "info")
+		k8sLogLevelStr = "info"
 	}
 	if logLevelStr == "" && k8sLogLevelStr != "" {
 		logLevelStr = k8sLogLevelStr
 	}
 	if logLevelStr != "" && k8sLogLevelStr == "" {
-		os.Setenv(k8sLogLevelEnvKey, logLevelStr)
+		k8sLogLevelStr = logLevelStr
 	}
+	_ = os.Setenv(k8sLogLevelEnvKey, k8sLogLevelStr)
 	logLevel, ok := logLevelMap[logLevelStr]
 	if !ok {
 		logLevel = log.InfoLevel
 	}
-
 	log.SetLevel(logLevel)
 	// format
 	if config.Format == "json" {
