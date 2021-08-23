@@ -20,19 +20,22 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
+	k8smnfconfig "github.com/IBM/integrity-shield/integrity-shield-server/pkg/config"
 	"github.com/sigstore/k8s-manifest-sigstore/pkg/k8smanifest"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-func InspectResources(resources []unstructured.Unstructured, ignoreFields k8smanifest.ObjectFieldBindingList, secrets []KeyConfig) []VerifyResult {
-	results := []VerifyResult{}
+func InspectResources(resources []unstructured.Unstructured, imageRef string, ignoreFields k8smanifest.ObjectFieldBindingList, secrets []k8smnfconfig.KeyConfig) []VerifyResultDetail {
+	results := []VerifyResultDetail{}
 	for _, resource := range resources {
 		log.Debug("Observed Resource:", resource.GetAPIVersion(), resource.GetKind(), resource.GetNamespace(), resource.GetName())
 		vo := &k8smanifest.VerifyResourceOption{}
 		vo.IgnoreFields = ignoreFields
 		vo.CheckDryRunForApply = true
+		vo.ImageRef = imageRef
 		vo.Provenance = true
 		namespace := os.Getenv("POD_NAMESPACE")
 		if namespace == "" {
@@ -42,8 +45,8 @@ func InspectResources(resources []unstructured.Unstructured, ignoreFields k8sman
 
 		// secret
 		for _, s := range secrets {
-			if s.KeySecertNamespace == resource.GetNamespace() {
-				pubkey, err := LoadKeySecret(s.KeySecertNamespace, s.KeySecretName)
+			if s.KeySecretNamespace == resource.GetNamespace() {
+				pubkey, err := LoadKeySecret(s.KeySecretNamespace, s.KeySecretName)
 				if err != nil {
 					fmt.Println("Failed to load pubkey; err: ", err.Error())
 				}
@@ -53,11 +56,23 @@ func InspectResources(resources []unstructured.Unstructured, ignoreFields k8sman
 		}
 		log.Debug("VerifyResourceOption", vo)
 		result, err := k8smanifest.VerifyResource(resource, vo)
+		log.Debug("VerifyResource result: ", result)
 		if err != nil {
-			fmt.Println("Failed to verify resource; err: ", err.Error())
+			log.Warning("Signature verification is required for this request, but verifyResource return error ; %s", err.Error())
+			results = append(results, VerifyResultDetail{
+				Time:                 time.Now().Format(timeFormat),
+				Kind:                 resource.GroupVersionKind().Kind,
+				ApiGroup:             resource.GetObjectKind().GroupVersionKind().Group,
+				ApiVersion:           resource.GetObjectKind().GroupVersionKind().Version,
+				Name:                 resource.GetName(),
+				Namespace:            resource.GetNamespace(),
+				Error:                true,
+				Message:              err.Error(),
+				Violation:            true,
+				VerifyResourceResult: nil,
+			})
 			continue
 		}
-
 		message := ""
 		if result.InScope {
 			if result.Verified {
@@ -78,13 +93,21 @@ func InspectResources(resources []unstructured.Unstructured, ignoreFields k8sman
 		if len(tmpMsg) > 0 {
 			resultMsg = tmpMsg[0]
 		}
-		verified := result.Verified
-		results = append(results, VerifyResult{
-			Resource:    resource,
-			Result:      resultMsg,
-			Verified:    verified,
-			SigRef:      result.SigRef,
-			Provenances: result.Provenances,
+
+		violation := true
+		if result.Verified {
+			violation = false
+		}
+		results = append(results, VerifyResultDetail{
+			Time: time.Now().Format(timeFormat),
+			// Resource:             resource,
+			Kind:                 resource.GroupVersionKind().Kind,
+			Name:                 resource.GetName(),
+			Namespace:            resource.GetNamespace(),
+			Error:                false,
+			Message:              resultMsg,
+			VerifyResourceResult: result,
+			Violation:            violation,
 		})
 	}
 	return results

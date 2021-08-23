@@ -70,3 +70,15 @@ func BuildManifestIntegrityProfileCRD(cr *apiv1alpha1.IntegrityShield) *extv1.Cu
 	}
 	return buildCRD("manifestintegrityprofiles.apis.integrityshield.io", cr.Namespace, crdNames, true)
 }
+
+//shield config crd
+func BuildVerifyResourceResultCRD(cr *apiv1alpha1.IntegrityShield) *extv1.CustomResourceDefinition {
+	crdNames := extv1.CustomResourceDefinitionNames{
+		Kind:       "VerifyResourceStatus",
+		Plural:     "verifyresourcestatuses",
+		ListKind:   "VerifyResourceStatusList",
+		Singular:   "verifyresourcestatus",
+		ShortNames: []string{"vrs"},
+	}
+	return buildCRD("verifyresourcestatuses.apis.integrityshield.io", cr.Namespace, crdNames, true)
+}

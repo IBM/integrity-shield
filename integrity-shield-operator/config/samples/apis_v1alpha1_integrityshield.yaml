@@ -24,7 +24,7 @@ spec:
   shieldApi:
     name: integrity-shield-api
     imagePullPolicy: Always
-    image: gcr.io/clean-resource-318209/integrity-shield-server:0.2.0
+    image: gcr.io/clean-resource-318209/integrity-shield-server:0.2.1
     port: 8080
     selector:     
       app: integrity-shield-api
@@ -399,56 +399,15 @@ spec:
     enabled: true
     name: integrity-shield-observer
     imagePullPolicy: Always
-    image: gcr.io/clean-resource-318209/integrity-shield-observer:0.2.0
+    image: gcr.io/clean-resource-318209/integrity-shield-observer:0.2.1
     selector:     
       app: integrity-shield-observer
     logLevel: info
-    interval: "60"
-    targetResourceConfigName: target-resource-config
-    targetResourceConfigKey: "config.yaml"
-    targetResourceConfig: |
-      ignoreFields:
-      - fields:
-        - metadata.namespace
-        objects:
-        - kind: ClusterServiceVersion
-      - fields:
-        - metadata.managedFields.*
-        - metadata.resourceVersion
-        - metadata.selfLink
-        - metadata.annotations.control-plane.alpha.kubernetes.io/leader
-        - metadata.annotations.kubectl.kubernetes.io/last-applied-configuration
-        - metadata.finalizers*
-        - metadata.annotations.namespace
-        - metadata.annotations.deprecated.daemonset.template.generation
-        - metadata.creationTimestamp
-        - metadata.uid
-        - metadata.generation
-        - status
-        - metadata.annotations.cosign.sigstore.dev/imageRef
-        - metadata.annotations.cosign.sigstore.dev/bundle
-        - metadata.annotations.cosign.sigstore.dev/message
-        - metadata.annotations.cosign.sigstore.dev/certificate
-        - metadata.annotations.cosign.sigstore.dev/signature
-        objects:
-        - name: '*'
-      - fields:
-        - secrets.*.name
-        - imagePullSecrets.*.name
-        objects:
-        - kind: ServiceAccount
-      - fields:
-        - spec.ports.*.nodePort
-        - spec.clusterIP
-        - spec.clusterIPs.0
-        objects:
-        - kind: Service
-      - fields:
-        - metadata.labels.olm.api.*
-        - metadata.labels.operators.coreos.com/*
-        - metadata.annotations.*
-        - spec.install.spec.deployments.*.spec.template.spec.containers.*.resources.limits.cpu
-        - spec.cleanup.enabled
-        objects:
-        - kind: ClusterServiceVersion   
-    
+    interval: "5"
+    observerConfigName: observer-config
+    observerConfigKey: "config.yaml"
+    observerConfig: |
+      targetConstraints:
+        match: ["*"]
+      exportDetailResult: true
+      resultDetailConfigName: verify-resource-result

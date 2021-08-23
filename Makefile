@@ -109,12 +109,16 @@ setup-test-env:
 	@echo creating test namespace
 	kubectl create ns $(TEST_NS)
 	kubectl create ns $(TEST_UNPROTECTED_NS)
+	@echo deploying gatekeeper
+	kubectl apply -f https://raw.githubusercontent.com/open-policy-agent/gatekeeper/release-3.5/deploy/gatekeeper.yaml
 
 clean-test-env:
 	@echo
 	@echo deleting test namespace
 	kubectl delete ns $(TEST_NS)
 	kubectl delete ns $(TEST_UNPROTECTED_NS)
+	@echo deleting gatekeeper
+	kubectl delete -f https://raw.githubusercontent.com/open-policy-agent/gatekeeper/release-3.5/deploy/gatekeeper.yaml
 
 create-kind-cluster:
 	@echo "creating cluster"

@@ -72,7 +72,7 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 	}
 
 	// load request handler config
-	rhconfig, err := loadRequestHandlerConfig()
+	rhconfig, err := LoadRequestHandlerConfig()
 	if err != nil {
 		log.Errorf("failed to load request handler config", err.Error())
 		errMsg := "IntegrityShield failed to decide the response. Failed to load request handler config: " + err.Error()
@@ -310,8 +310,8 @@ func setVerifyOption(paramObj *k8smnfconfig.ParameterObject, config *k8smnfconfi
 	if len(paramObj.KeyConfigs) != 0 {
 		keyPathList := []string{}
 		for _, keyconfig := range paramObj.KeyConfigs {
-			if keyconfig.KeySecertName != "" {
-				keyPath, err := k8smnfconfig.LoadKeySecret(keyconfig.KeySecertNamespace, keyconfig.KeySecertName)
+			if keyconfig.KeySecretName != "" {
+				keyPath, err := k8smnfconfig.LoadKeySecret(keyconfig.KeySecretNamespace, keyconfig.KeySecretName)
 				if err != nil {
 					log.Errorf("failed to load key secret", err.Error())
 				}
@@ -334,7 +334,7 @@ func setVerifyOption(paramObj *k8smnfconfig.ParameterObject, config *k8smnfconfi
 	return vo
 }
 
-func loadRequestHandlerConfig() (*k8smnfconfig.RequestHandlerConfig, error) {
+func LoadRequestHandlerConfig() (*k8smnfconfig.RequestHandlerConfig, error) {
 	namespace := os.Getenv("POD_NAMESPACE")
 	if namespace == "" {
 		namespace = defaultPodNamespace
@@ -343,7 +343,7 @@ func loadRequestHandlerConfig() (*k8smnfconfig.RequestHandlerConfig, error) {
 	if configName == "" {
 		configName = defaultHandlerConfigMapName
 	}
-	configKey := os.Getenv("REQUEST_HANDLER__CONFIG_KEY")
+	configKey := os.Getenv("REQUEST_HANDLER_CONFIG_KEY")
 	if configKey == "" {
 		configKey = defaultConfigKeyInConfigMap
 	}

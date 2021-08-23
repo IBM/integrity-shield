@@ -23,11 +23,13 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
-	"text/tabwriter"
 	"time"
 
+	k8smnfconfig "github.com/IBM/integrity-shield/integrity-shield-server/pkg/config"
+	ishield "github.com/IBM/integrity-shield/integrity-shield-server/pkg/shield"
+	vrres "github.com/IBM/integrity-shield/observer/pkg/apis/verifyresourcestatus/v1alpha1"
+	vrresclient "github.com/IBM/integrity-shield/observer/pkg/client/verifyresourcestatus/clientset/versioned/typed/verifyresourcestatus/v1alpha1"
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 	"github.com/sigstore/k8s-manifest-sigstore/pkg/k8smanifest"
@@ -36,6 +38,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
@@ -47,11 +50,16 @@ const timeFormat = "2006-01-02 15:04:05"
 
 const defaultConfigKeyInConfigMap = "config.yaml"
 const defaultPodNamespace = "k8s-manifest-sigstore"
-const defaultTargetResourceConfigName = "target-resource-config"
+const defaultObserverConfigName = "observer-config"
+const defaultObserverResultDetailConfigName = "verify-result-detail"
+const defaultHandlerConfigMapName = "request-handler-config"
 const logLevelEnvKey = "LOG_LEVEL"
 const k8sLogLevelEnvKey = "K8S_MANIFEST_SIGSTORE_LOG_LEVEL"
 
-const ImageRefAnnotationKey = "cosign.sigstore.dev/imageRef"
+// const ImageRefAnnotationKey = "cosign.sigstore.dev/imageRef"
+
+const VerifyResourceViolationLabel = "integrityshield.io/verifyResourceViolation"
+const VerifyResourceIgnoreLabel = "integrityshield.io/verifyResourceIgnored"
 
 type Inspector struct {
 	APIResources []groupResource
@@ -59,58 +67,48 @@ type Inspector struct {
 	dynamicClient dynamic.Interface
 }
 
-type TargetResourceConfig struct {
-	TargetResources          []groupResourceWithTargetNS        `json:"targetResouces"`
-	IgnoreFields             k8smanifest.ObjectFieldBindingList `json:"ignoreFields,omitempty"`
-	KeyConfigs               []KeyConfig                        `json:"keyConfigs"`
-	ResourceProvenanceConfig ResourceProvenanceConfig           `json:"resourceProvenanceConfig,omitempty"`
+// type TargetResourceConfig struct {
+// 	// TargetResources          []groupResourceWithTargetNS        `json:"targetResouces"`
+// 	IgnoreFields k8smanifest.ObjectFieldBindingList `json:"ignoreFields,omitempty"`
+// 	// KeyConfigs               []KeyConfig                        `json:"keyConfigs"`
+// 	// ResourceProvenanceConfig ResourceProvenanceConfig `json:"resourceProvenanceConfig,omitempty"`
+// }
+
+// Observer Config
+type ObserverConfig struct {
+	TargetConstraints      Rule   `json:"targetConstraints,omitempty"`
+	ExportDetailResult     bool   `json:"exportDetailResult,omitempty"`
+	ResultDetailConfigName string `json:"resultDetailConfigName,omitempty"`
+	ResultDetailConfigKey  string `json:"resultDetailConfigKey,omitempty"`
 }
 
-type VerifyResult struct {
-	Resource    unstructured.Unstructured `json:"resource"`
-	Result      string                    `json:"result"`
-	Verified    bool                      `json:"verified"`
-	SigRef      string                    `json:"sigRef"`
-	Provenances []*k8smanifest.Provenance `json:"provenances"`
+type Rule struct {
+	Match   []string `json:"match,omitempty"`
+	Exclude []string `json:"exclude,omitempty"`
 }
 
-type FinalObservationResourceResult struct {
-	Namespace                 string                     `json:"namespace"`
-	Name                      string                     `json:"name"`
-	Kind                      string                     `json:"kind"`
-	ManifestProvenanceResults []ManifestProvenanceResult `json:"gitData"`
+// Observer Result Detail
+type VerifyResultDetail struct {
+	Time                 string                            `json:"time"`
+	Namespace            string                            `json:"namespace"`
+	Name                 string                            `json:"name"`
+	Kind                 string                            `json:"kind"`
+	ApiGroup             string                            `json:"apiGroup"`
+	ApiVersion           string                            `json:"apiVersion"`
+	Error                bool                              `json:"error"`
+	Message              string                            `json:"message"`
+	Violation            bool                              `json:"violation"`
+	VerifyResourceResult *k8smanifest.VerifyResourceResult `json:"verifyResourceResult"`
+}
+type ConstraintResult struct {
+	ConstraintName  string               `json:"constraintName"`
+	Violation       bool                 `json:"violation"`
+	TotalViolations int                  `json:"totalViolations"`
+	Results         []VerifyResultDetail `json:"results"`
 }
 
-type ObservationResourceResult struct {
-	Namespace              string `json:"namespace"`
-	Name                   string `json:"name"`
-	Kind                   string `json:"kind"`
-	Resource               unstructured.Unstructured
-	ManifestProvenanceInfo []ManifestProvenanceFromVerifyResource `json:"manifestProvenanceInfo"`
-}
-
-type ManifestProvenanceFromVerifyResource struct {
-	Artifact  string `json:"artifact"`
-	GitApiURL string `json:"gitApiURL"`
-	GitRepo   string `json:"gitRepo"`
-	CommitID  string `json:"commitID"`
-	Hash      string `json:"hash"`
-}
-
-type ManifestProvenanceResult struct {
-	Artifact   string   `json:"artifact"`
-	GitRepo    string   `json:"gitRepo"`
-	GitApiURL  string   `json:"gitApiURL"`
-	CommitID   string   `json:"commitID"`
-	CommitDate string   `json:"commitDate"`
-	Author     string   `json:"author"`
-	Files      []string `json:"files"`
-	Hash       string   `json:"hash"`
-}
-
-type groupResourceWithTargetNS struct {
-	groupResource    `json:""`
-	TargetNamespaces []string `json:"targetNamespace"`
+type ObservationDetailResults struct {
+	ConstraintResults []ConstraintResult `json:"constraintResults"`
 }
 
 // groupResource contains the APIGroup and APIResource
@@ -120,19 +118,9 @@ type groupResource struct {
 	APIResource metav1.APIResource `json:"resource"`
 }
 
-type ResourceProvenanceConfig struct {
-	AnalyzeCommitData bool             `json:"analyzeCommitData,omitempty"`
-	GitTokenConfigs   []GitTokenConfig `json:"gitTokenConfigs,omitempty"`
-}
-
-type GitTokenConfig struct {
-	GitToken        string `json:"gitToken"`
-	TargetNamespace string `json:"targetNamespace"`
-}
-
-type KeyConfig struct {
-	KeySecretName      string `json:"keySecretName"`
-	KeySecertNamespace string `json:"keySecretNamespace"`
+type groupResourceWithTargetNS struct {
+	groupResource    `json:""`
+	TargetNamespaces []string `json:"targetNamespace"`
 }
 
 var logLevelMap = map[string]log.Level{
@@ -151,7 +139,7 @@ func NewInspector() *Inspector {
 }
 
 func (self *Inspector) Init() error {
-	log.Info("init Inspector....")
+	log.Info("init Observer....")
 	kubeconf, _ := kubeutil.GetKubeConfig()
 
 	var err error
@@ -185,79 +173,301 @@ func (self *Inspector) Init() error {
 }
 
 func (self *Inspector) Run() {
-	// load configmap
-	tconfig, err := loadTargetResourceConfig()
+	// load config -> requestHandlerConfig
+	rhconfig, err := ishield.LoadRequestHandlerConfig()
 	if err != nil {
-		fmt.Println("Failed to load TargetResourceConfig; err: ", err.Error())
+		fmt.Println("Failed to load RequestHandlerConfig; err: ", err.Error())
 	}
-	narrowedGVKList := tconfig.TargetResources
-	ignoreFields := tconfig.IgnoreFields
-	secrets := tconfig.KeyConfigs
-	if narrowedGVKList == nil {
-		fmt.Println("there is no resources to observe.")
-		return
+	// load observer config
+	tcconfig, err := loadObserverConfig()
+	if err != nil {
+		fmt.Println("Failed to load Observer config; err: ", err.Error())
 	}
-	// get all resources of extracted GVKs
-	resources := []unstructured.Unstructured{}
-	for _, gResource := range narrowedGVKList {
-		tmpResources, _ := self.getAllResoucesByGroupResource(gResource)
-		resources = append(resources, tmpResources...)
+	// load constraints
+	constraints, err := self.loadConstraints()
+	if err != nil {
+		fmt.Println("Failed to load constraints; err: ", err.Error())
 	}
-	// check all resources by verifyResource
-	results := InspectResources(resources, ignoreFields, secrets)
-	// stdout log
-	fmt.Println("\nObservation time", time.Now().Format(timeFormat))
-	w := tabwriter.NewWriter(os.Stdout, 1, 1, 1, ' ', 0)
-	// signature verification
-	fmt.Fprintln(w, "Verified\tNamespace\tKind\tName\tMessage\t")
-	for _, res := range results {
-		resStr := strconv.FormatBool(res.Verified) + "\t" + res.Resource.GetNamespace() + "\t" + res.Resource.GetKind() + "\t" + res.Resource.GetName() + "\t" + res.Result + "\t"
-		fmt.Fprintln(w, resStr)
-	}
-	w.Flush()
+	// ObservationDetailResults
+	var constraintResults []ConstraintResult
+	for _, constraint := range constraints {
+		constraintName := constraint.Parameters.ConstraintName
+		var violations []vrres.VerifyResult
+		var nonViolations []vrres.VerifyResult
+		narrowedGVKList := self.getPossibleProtectedGVKs(constraint.Match)
+		log.Debug("narrowedGVKList", narrowedGVKList)
+		ignoreFields := constraint.Parameters.IgnoreFields
+		secrets := constraint.Parameters.KeyConfigs
+		if narrowedGVKList == nil {
+			fmt.Println("there is no resources to observe in the constraint:", constraint.Parameters.ConstraintName)
+			return
+		}
+		// get all resources of extracted GVKs
+		resources := []unstructured.Unstructured{}
+		for _, gResource := range narrowedGVKList {
+			tmpResources, _ := self.getAllResoucesByGroupResource(gResource)
+			resources = append(resources, tmpResources...)
+		}
 
-	if tconfig.ResourceProvenanceConfig.AnalyzeCommitData {
-		// provenances
-		var lastLog []FinalObservationResourceResult
-		f, err := os.Open("output.json")
-		if err != nil {
-			log.Debug("no file exists", err)
+		// check all resources by verifyResource
+		ignoreFields = append(ignoreFields, rhconfig.RequestFilterProfile.IgnoreFields...)
+		results := InspectResources(resources, constraint.Parameters.ImageRef, ignoreFields, secrets)
+		for _, res := range results {
+			// simple result
+
+			if res.Violation {
+				vres := vrres.VerifyResult{
+					Namespace:  res.Namespace,
+					Name:       res.Name,
+					Kind:       res.Kind,
+					ApiGroup:   res.ApiGroup,
+					ApiVersion: res.ApiVersion,
+					Result:     res.Message,
+				}
+				violations = append(violations, vres)
+			} else {
+				vres := vrres.VerifyResult{
+					Namespace:  res.Namespace,
+					Name:       res.Name,
+					Kind:       res.Kind,
+					ApiGroup:   res.ApiGroup,
+					ApiVersion: res.ApiVersion,
+					Signer:     res.VerifyResourceResult.Signer,
+					SigRef:     res.VerifyResourceResult.SigRef,
+					SignedTime: res.VerifyResourceResult.SignedTime,
+					Result:     res.Message,
+				}
+				nonViolations = append(nonViolations, vres)
+			}
+			log.WithFields(log.Fields{
+				"constraintName": constraintName,
+				"violation":      res.Violation,
+				"kind":           res.Kind,
+				"name":           res.Name,
+				"namespace":      res.Namespace,
+			}).Info(res.Message)
+		}
+		// summarize results
+		var violated bool
+		if len(violations) != 0 {
+			violated = true
 		} else {
-			err = json.NewDecoder(f).Decode(&lastLog)
-			if err != nil {
-				fmt.Println("err", err)
+			violated = false
+		}
+		count := len(violations)
+
+		vrr := vrres.VerifyResourceStatusSpec{
+			ConstraintName:  constraintName,
+			Violation:       violated,
+			TotalViolations: count,
+			Violations:      violations,
+			NonViolations:   nonViolations,
+			ObservationTime: time.Now().Format(timeFormat),
+		}
+
+		// check if targeted constraint
+		ignored := checkIfInscopeConstraint(constraintName, tcconfig)
+
+		// export VerifyResult
+		_ = exportVerifyResult(vrr, ignored, violated)
+		// VerifyResultDetail
+		cres := ConstraintResult{
+			ConstraintName:  constraintName,
+			Results:         results,
+			Violation:       violated,
+			TotalViolations: count,
+		}
+		constraintResults = append(constraintResults, cres)
+	}
+
+	// export ConstraintResult
+	res := ObservationDetailResults{
+		ConstraintResults: constraintResults,
+	}
+	_ = exportResultDetail(res, tcconfig)
+	return
+}
+
+// TODO: need to check again
+func checkIfInscopeConstraint(constraintName string, tcconfig *ObserverConfig) bool {
+	if tcconfig == nil {
+		return false
+	}
+	ignored := false
+	if len(tcconfig.TargetConstraints.Match) == 0 {
+		ignored = false
+	} else {
+		match := false
+		for _, p := range tcconfig.TargetConstraints.Match {
+			included := MatchPattern(p, constraintName)
+			if included {
+				match = true
 			}
 		}
-		defer f.Close()
-
-		finalObservationResults := InspectGitProvenance(lastLog, results, tconfig.ResourceProvenanceConfig.GitTokenConfigs)
-
-		// log
-		fmt.Println("\nProvenance log")
-		w = tabwriter.NewWriter(os.Stdout, 1, 1, 1, ' ', 0)
-		fmt.Fprintln(w, "Namespace\tKind\tName\tLastUpdate\tCommitID\tAuthor\tFiles\t")
-		for _, res := range finalObservationResults {
-			for _, pres := range res.ManifestProvenanceResults {
-				files := strings.Join(pres.Files, ",")
-				resStr := res.Namespace + "\t" + res.Kind + "\t" + res.Name + "\t" + pres.CommitDate + "\t" + pres.CommitID + "\t" + pres.Author + "\t" + files + "\t"
-				fmt.Fprintln(w, resStr)
-			}
-		}
-		w.Flush()
-
-		// export log
-		f, err = os.Create("output.json")
-		if err != nil {
-			return
-		}
-		defer f.Close()
-
-		err = json.NewEncoder(f).Encode(finalObservationResults)
-		if err != nil {
-			return
+		if match {
+			ignored = false
+		} else {
+			ignored = true
 		}
 	}
-	return
+	if !ignored && len(tcconfig.TargetConstraints.Exclude) != 0 {
+		match := false
+		for _, p := range tcconfig.TargetConstraints.Exclude {
+			excluded := MatchPattern(p, constraintName)
+			if excluded {
+				match = true
+			}
+		}
+		if match {
+			ignored = true
+		} else {
+			ignored = false
+		}
+	}
+	return ignored
+}
+
+func exportVerifyResult(vrr vrres.VerifyResourceStatusSpec, ignored bool, violated bool) error {
+	config, err := kubeutil.GetKubeConfig()
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	clientset, err := vrresclient.NewForConfig(config)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	namespace := os.Getenv("POD_NAMESPACE")
+	if namespace == "" {
+		namespace = defaultPodNamespace
+	}
+
+	obj, err := clientset.VerifyResourceStatuses(namespace).Get(context.Background(), vrr.ConstraintName, metav1.GetOptions{})
+	if err != nil || obj == nil {
+		log.Info("creating new VerifyResourceStatus resource...")
+		newVRR := &vrres.VerifyResourceStatus{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: vrr.ConstraintName,
+			},
+			Spec: vrr,
+		}
+		// label
+		vv := "false"
+		iv := "false"
+		if violated {
+			vv = "true"
+		}
+		if ignored {
+			iv = "true"
+		}
+
+		labels := map[string]string{
+			VerifyResourceViolationLabel: vv,
+			VerifyResourceIgnoreLabel:    iv,
+		}
+		newVRR.Labels = labels
+
+		_, err = clientset.VerifyResourceStatuses(namespace).Create(context.Background(), newVRR, metav1.CreateOptions{})
+		if err != nil {
+			log.Error("failed to create VerifyResourceStatuses:", err.Error())
+			return err
+		}
+	} else {
+		log.Info("updating VerifyResourceStatuses resource...")
+		obj.Spec = vrr
+		// label
+		vv := "false"
+		iv := "false"
+		if violated {
+			vv = "true"
+		}
+		if ignored {
+			iv = "true"
+		}
+
+		labels := map[string]string{
+			VerifyResourceViolationLabel: vv,
+			VerifyResourceIgnoreLabel:    iv,
+		}
+		obj.Labels = labels
+
+		_, err = clientset.VerifyResourceStatuses(namespace).Update(context.Background(), obj, metav1.UpdateOptions{})
+		if err != nil {
+			log.Error("failed to update VerifyResourceStatuses:", err.Error())
+			return err
+		}
+	}
+	return nil
+}
+
+// TODO: fix param
+func exportResultDetail(results ObservationDetailResults, oconfig *ObserverConfig) error {
+	if !oconfig.ExportDetailResult {
+		return nil
+	}
+	if len(results.ConstraintResults) == 0 {
+		log.Info("no observation results")
+		return nil
+	}
+	namespace := os.Getenv("POD_NAMESPACE")
+	if namespace == "" {
+		namespace = defaultPodNamespace
+	}
+
+	configName := oconfig.ResultDetailConfigName
+	if configName == "" {
+		configName = defaultObserverResultDetailConfigName
+	}
+
+	configKey := oconfig.ResultDetailConfigKey
+	if configKey == "" {
+		configKey = defaultConfigKeyInConfigMap
+	}
+
+	// load
+	config, err := kubeutil.GetKubeConfig()
+	if err != nil {
+		return nil
+	}
+	clientset, err := kubeclient.NewForConfig(config)
+	if err != nil {
+		log.Error(err)
+		return nil
+	}
+	cm, err := clientset.CoreV1().ConfigMaps(namespace).Get(context.Background(), configName, metav1.GetOptions{})
+	if err != nil {
+		// create
+		log.Info("creating new configmap to store verify result...", configName)
+		newcm := &v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: configName,
+			},
+		}
+		resByte, _ := json.Marshal(results)
+		newcm.Data = map[string]string{
+			configKey: string(resByte),
+		}
+		_, err := clientset.CoreV1().ConfigMaps(namespace).Create(context.Background(), newcm, metav1.CreateOptions{})
+		if err != nil {
+			log.Error("failed to create configmap", err.Error())
+			return err
+		}
+		return nil
+	} else {
+		// update
+		log.Info("updating configmap ...", configName)
+		resByte, _ := json.Marshal(results)
+		cm.Data = map[string]string{
+			configKey: string(resByte),
+		}
+		_, err := clientset.CoreV1().ConfigMaps(namespace).Update(context.Background(), cm, metav1.UpdateOptions{})
+		if err != nil {
+			log.Error("failed to update configmap", err.Error())
+			return err
+		}
+	}
+	return nil
 }
 
 func (self *Inspector) getAPIResources(kubeconfig *rest.Config) error {
@@ -313,6 +523,7 @@ func (self *Inspector) getAllResoucesByGroupResource(gResourceWithTargetNS group
 		for _, ns := range targetNSs {
 			tmpResourceList, err = self.dynamicClient.Resource(gvr).Namespace(ns).List(context.Background(), metav1.ListOptions{})
 			if err != nil {
+				log.Error("failed to get tmpResourceList:", err.Error())
 				break
 			}
 			resources = append(resources, tmpResourceList.Items...)
@@ -348,16 +559,16 @@ func convertGVKToGVR(gvk schema.GroupVersionKind, apiResouces []groupResource) s
 	return found
 }
 
-func loadTargetResourceConfig() (*TargetResourceConfig, error) {
+func loadObserverConfig() (*ObserverConfig, error) {
 	namespace := os.Getenv("POD_NAMESPACE")
 	if namespace == "" {
 		namespace = defaultPodNamespace
 	}
-	configName := os.Getenv("TARGET_RESOURCE_CONFIG_NAME")
+	configName := os.Getenv("OBSERVER_CONFIG_NAME")
 	if configName == "" {
-		configName = defaultTargetResourceConfigName
+		configName = defaultObserverConfigName
 	}
-	configKey := os.Getenv("CONFIG_KEY")
+	configKey := os.Getenv("OBSERVER_CONFIG_KEY")
 	if configKey == "" {
 		configKey = defaultConfigKeyInConfigMap
 	}
@@ -379,7 +590,7 @@ func loadTargetResourceConfig() (*TargetResourceConfig, error) {
 	if !found {
 		return nil, errors.New(fmt.Sprintf("`%s` is not found in configmap", configKey))
 	}
-	var tr *TargetResourceConfig
+	var tr *ObserverConfig
 	err = yaml.Unmarshal([]byte(cfgBytes), &tr)
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("failed to unmarshal config.yaml into %T", tr))
@@ -418,4 +629,178 @@ func LoadKeySecret(keySecertNamespace, keySecertName string) (string, error) {
 	}
 
 	return keyPath, nil
+}
+
+//
+// Constraint
+//
+
+type ConstraintSpec struct {
+	Match      MatchCondition               `json:"match,omitempty"`
+	Parameters k8smnfconfig.ParameterObject `json:"parameters,omitempty"`
+}
+
+type MatchCondition struct {
+	Kinds              []Kinds               `json:"kinds,omitempty"`
+	Namespaces         []string              `json:"namespaces,omitempty"`
+	ExcludedNamespaces []string              `json:"excludedNamespaces,omitempty"`
+	LabelSelector      *metav1.LabelSelector `json:"labelSelector,omitempty"`
+	NamespaceSelector  *metav1.LabelSelector `json:"namespaceSelector,omitempty"`
+}
+
+type Kinds struct {
+	Kinds     []string `json:"kinds,omitempty"`
+	ApiGroups []string `json:"apiGroups,omitempty"`
+}
+
+func (self *Inspector) loadConstraints() ([]ConstraintSpec, error) {
+	gvr := schema.GroupVersionResource{
+		Group:    "constraints.gatekeeper.sh",
+		Version:  "v1beta1",
+		Resource: "manifestintegrityconstraint",
+	}
+	constraintList, err := self.dynamicClient.Resource(gvr).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	micList := []ConstraintSpec{}
+	for _, unstructed := range constraintList.Items {
+		log.Debug("unstructed.Object", unstructed.Object)
+		var mic ConstraintSpec
+		spec, ok := unstructed.Object["spec"]
+		if !ok {
+			fmt.Println("failed to get spec in constraint", unstructed.GetName())
+		}
+		jsonStr, err := json.Marshal(spec)
+		if err != nil {
+			fmt.Println(err)
+		}
+		if err := json.Unmarshal(jsonStr, &mic); err != nil {
+			fmt.Println(err)
+		}
+		log.Debug("ManigestIntegrityConstraint:", mic)
+		micList = append(micList, mic)
+	}
+	return micList, nil
+}
+
+func (self *Inspector) getPossibleProtectedGVKs(match MatchCondition) []groupResourceWithTargetNS {
+	possibleProtectedGVKs := []groupResourceWithTargetNS{}
+	for _, apiResource := range self.APIResources {
+		matched, tmpGvks := checkIfRuleMatchWithGVK(match, apiResource)
+		if matched {
+			possibleProtectedGVKs = append(possibleProtectedGVKs, tmpGvks...)
+			break
+		}
+	}
+	return possibleProtectedGVKs
+}
+
+func checkIfRuleMatchWithGVK(match MatchCondition, apiResource groupResource) (bool, []groupResourceWithTargetNS) {
+	possibleProtectedGVKs := []groupResourceWithTargetNS{}
+	// need to support "selector label"
+	if len(match.Kinds) == 0 {
+		return false, nil
+	}
+	matched := false
+	for _, kinds := range match.Kinds {
+		kmatch := false
+		agmatch := false
+		if len(kinds.ApiGroups) != 0 {
+			agmatch = Contains(kinds.ApiGroups, apiResource.APIGroup)
+		} else {
+			agmatch = true
+		}
+		if len(kinds.ApiGroups) != 0 {
+			kmatch = Contains(kinds.Kinds, apiResource.APIResource.Kind)
+		} else {
+			kmatch = true
+		}
+		log.WithFields(log.Fields{
+			"MatchRule.kinds.ApiGroups": agmatch,
+			"MatchRule.kinds.Kinds":     kmatch,
+			"APIGroup":                  apiResource.APIGroup,
+			"Kind":                      apiResource.APIResource.Kind,
+		}).Debug("check match condition")
+		if kmatch && agmatch {
+			matched = true
+			namespaces := match.Namespaces
+			// need to support namespace selector
+			if match.NamespaceSelector != nil {
+				labeledNS := getLabelMatchedNamespace(match.NamespaceSelector)
+				namespaces = append(namespaces, labeledNS...)
+			}
+			possibleProtectedGVKs = append(possibleProtectedGVKs, groupResourceWithTargetNS{
+				groupResource:    apiResource,
+				TargetNamespaces: namespaces,
+			})
+		}
+	}
+	log.WithFields(log.Fields{
+		"matched":               matched,
+		"possibleProtectedGVKs": possibleProtectedGVKs,
+	}).Debug("check match condition")
+	return matched, possibleProtectedGVKs
+}
+
+func Contains(pattern []string, value string) bool {
+	for _, p := range pattern {
+		if p == value {
+			return true
+		}
+	}
+	return false
+}
+
+func getLabelMatchedNamespace(labelSelector *metav1.LabelSelector) []string {
+	matchedNs := []string{}
+	if labelSelector == nil {
+		return []string{}
+	}
+	config, err := kubeutil.GetKubeConfig()
+	if err != nil {
+		return []string{}
+	}
+	clientset, err := kubeclient.NewForConfig(config)
+	if err != nil {
+		log.Error(err)
+		return []string{}
+	}
+	namespaces, err := clientset.CoreV1().Namespaces().List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		log.Errorf("failed to list a namespace:`%s`", err.Error())
+		return []string{}
+	}
+	selector, err := metav1.LabelSelectorAsSelector(labelSelector)
+	if err != nil {
+		log.Errorf("failed to convert the LabelSelector api type into a struct that implements labels.Selector; %s", err.Error())
+		return []string{}
+	}
+
+	for _, ns := range namespaces.Items {
+		labelsMap := ns.GetLabels()
+		labelsSet := labels.Set(labelsMap)
+		matched := selector.Matches(labelsSet)
+		if matched {
+			matchedNs = append(matchedNs, ns.Name)
+		}
+	}
+
+	return matchedNs
+}
+
+func MatchPattern(pattern, value string) bool {
+	if pattern == "" {
+		return true
+	} else if pattern == "*" {
+		return true
+	} else if pattern == "-" && value == "" {
+		return true
+	} else if strings.HasSuffix(pattern, "*") {
+		return strings.HasPrefix(value, strings.TrimRight(pattern, "*"))
+	} else if pattern == value {
+		return true
+	} else {
+		return false
+	}
 }

@@ -35,8 +35,8 @@ type ParameterObject struct {
 }
 
 type KeyConfig struct {
-	KeySecertName      string `json:"keySecretName,omitempty"`
-	KeySecertNamespace string `json:"keySecretNamespace,omitempty"`
+	KeySecretName      string `json:"keySecretName,omitempty"`
+	KeySecretNamespace string `json:"keySecretNamespace,omitempty"`
 }
 
 type ObjectUserBindingList []ObjectUserBinding

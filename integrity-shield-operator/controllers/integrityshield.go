@@ -137,6 +137,18 @@ func (r *IntegrityShieldReconciler) deleteManifestIntegrityProfileCRD(
 	return r.deleteCRD(instance, expected)
 }
 
+func (r *IntegrityShieldReconciler) createOrUpdateVerifyResourceResultCRD(
+	instance *apiv1alpha1.IntegrityShield) (ctrl.Result, error) {
+	expected := res.BuildVerifyResourceResultCRD(instance)
+	return r.createOrUpdateCRD(instance, expected)
+}
+
+func (r *IntegrityShieldReconciler) deleteVerifyResourceResultCRD(
+	instance *apiv1alpha1.IntegrityShield) (ctrl.Result, error) {
+	expected := res.BuildVerifyResourceResultCRD(instance)
+	return r.deleteCRD(instance, expected)
+}
+
 /**********************************************
 
 				ConfigMap

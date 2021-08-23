@@ -198,6 +198,7 @@ func BuildRoleForIShield(cr *apiv1alpha1.IntegrityShield) *rbacv1.Role {
 	return role
 }
 
+// TODO: should be minimum privilege
 func BuildClusterRoleForObserver(cr *apiv1alpha1.IntegrityShield) *rbacv1.ClusterRole {
 	labels := map[string]string{
 		"app":                          cr.Name,
@@ -220,7 +221,7 @@ func BuildClusterRoleForObserver(cr *apiv1alpha1.IntegrityShield) *rbacv1.Cluste
 					"*",
 				},
 				Verbs: []string{
-					"get", "list",
+					"get", "list", "create", "update",
 				},
 			},
 		},

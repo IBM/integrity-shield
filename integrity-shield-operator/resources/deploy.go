@@ -303,12 +303,28 @@ func BuildDeploymentForObserver(cr *apiv1alpha1.IntegrityShield) *appsv1.Deploym
 				Value: cr.Spec.Observer.LogLevel,
 			},
 			{
-				Name:  "CONFIG_KEY",
-				Value: cr.Spec.Observer.TargetResourceConfigKey,
+				Name:  "REQUEST_HANDLER_CONFIG_KEY",
+				Value: cr.Spec.RequestHandlerConfigKey,
 			},
 			{
-				Name:  "TARGET_RESOURCE_CONFIG_NAME",
-				Value: cr.Spec.Observer.TargetResourceConfigName,
+				Name:  "REQUEST_HANDLER_CONFIG_NAME",
+				Value: cr.Spec.RequestHandlerConfigName,
+			},
+			// {
+			// 	Name:  "OBSERVER_RESULT_CONFIG_NAME",
+			// 	Value: cr.Spec.Observer.ResultDetailConfigName,
+			// },
+			// {
+			// 	Name:  "OBSERVER_RESULT_CONFIG_KEY",
+			// 	Value: cr.Spec.Observer.ResultDetailConfigKey,
+			// },
+			{
+				Name:  "OBSERVER_CONFIG_NAME",
+				Value: cr.Spec.Observer.ObserverConfigName,
+			},
+			{
+				Name:  "OBSERVER_CONFIG_KEY",
+				Value: cr.Spec.Observer.ObserverConfigKey,
 			},
 			{
 				Name:  "INTERVAL",

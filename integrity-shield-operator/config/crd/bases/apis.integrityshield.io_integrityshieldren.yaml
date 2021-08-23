@@ -869,6 +869,12 @@ spec:
                     type: string
                   name:
                     type: string
+                  observerConfig:
+                    type: string
+                  observerConfigKey:
+                    type: string
+                  observerConfigName:
+                    type: string
                   securityContext:
                     description: SecurityContext holds security configuration that
                       will be applied to a container. Some fields are present in both
@@ -1021,12 +1027,6 @@ spec:
                     additionalProperties:
                       type: string
                     type: object
-                  targetResourceConfig:
-                    type: string
-                  targetResourceConfigKey:
-                    type: string
-                  targetResourceConfigName:
-                    type: string
                 type: object
               rego:
                 type: string

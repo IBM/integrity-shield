@@ -55,11 +55,11 @@ func BuildACConfigForIShield(cr *apiv1alpha1.IntegrityShield) *corev1.ConfigMap 
 // request handler config
 func BuildObserverConfigForIShield(cr *apiv1alpha1.IntegrityShield) *corev1.ConfigMap {
 	data := map[string]string{
-		cr.Spec.Observer.TargetResourceConfigKey: cr.Spec.Observer.TargetResourceConfig,
+		cr.Spec.Observer.ObserverConfigKey: cr.Spec.Observer.ObserverConfig,
 	}
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      cr.Spec.Observer.TargetResourceConfigName,
+			Name:      cr.Spec.Observer.ObserverConfigName,
 			Namespace: cr.Namespace,
 		},
 		Data: data,

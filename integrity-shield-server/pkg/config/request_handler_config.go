@@ -103,15 +103,15 @@ func SetupLogger(config LogConfig, req admission.Request) {
 	}
 }
 
-func LoadKeySecret(keySecertNamespace, keySecertName string) (string, error) {
-	obj, err := kubeutil.GetResource("v1", "Secret", keySecertNamespace, keySecertName)
+func LoadKeySecret(keySecretNamespace, keySecretName string) (string, error) {
+	obj, err := kubeutil.GetResource("v1", "Secret", keySecretNamespace, keySecretName)
 	if err != nil {
-		return "", errors.Wrap(err, fmt.Sprintf("failed to get a secret `%s` in `%s` namespace", keySecertName, keySecertNamespace))
+		return "", errors.Wrap(err, fmt.Sprintf("failed to get a secret `%s` in `%s` namespace", keySecretName, keySecretNamespace))
 	}
 	objBytes, _ := json.Marshal(obj.Object)
 	var secret v1.Secret
 	_ = json.Unmarshal(objBytes, &secret)
-	keyDir := fmt.Sprintf("/tmp/%s/%s/", keySecertNamespace, keySecertName)
+	keyDir := fmt.Sprintf("/tmp/%s/%s/", keySecretNamespace, keySecretName)
 	sumErr := []string{}
 	keyPath := ""
 	for fname, keyData := range secret.Data {
@@ -129,7 +129,7 @@ func LoadKeySecret(keySecertNamespace, keySecertName string) (string, error) {
 		return "", errors.New(fmt.Sprintf("failed to save secret data as a file; %s", strings.Join(sumErr, "; ")))
 	}
 	if keyPath == "" {
-		return "", errors.New(fmt.Sprintf("no key files are found in the secret `%s` in `%s` namespace", keySecertName, keySecertNamespace))
+		return "", errors.New(fmt.Sprintf("no key files are found in the secret `%s` in `%s` namespace", keySecretName, keySecretNamespace))
 	}
 
 	return keyPath, nil

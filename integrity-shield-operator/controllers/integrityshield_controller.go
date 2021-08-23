@@ -143,6 +143,10 @@ func (r *IntegrityShieldReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	// Observer
 	if instance.Spec.Observer.Enabled {
+		recResult, recErr = r.createOrUpdateVerifyResourceResultCRD(instance)
+		if recErr != nil || recResult.Requeue {
+			return recResult, recErr
+		}
 		recResult, recErr = r.createOrUpdateObserverConfig(instance)
 		if recErr != nil || recResult.Requeue {
 			return recResult, recErr
@@ -296,6 +300,10 @@ func (r *IntegrityShieldReconciler) deleteClusterScopedChildrenResources(instanc
 			return err
 		}
 		_, err = r.deleteObserverClusterRoleBindingForIShield(instance)
+		if err != nil {
+			return err
+		}
+		_, err = r.deleteVerifyResourceResultCRD(instance)
 		if err != nil {
 			return err
 		}
