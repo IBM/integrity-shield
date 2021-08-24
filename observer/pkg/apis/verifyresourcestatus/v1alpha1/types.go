@@ -22,10 +22,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var layout = "2006-01-02 15:04:05"
-
-const maxHistoryLength = 10
-
 // VerifyResourceStatusSpec defines the desired state of AppEnforcePolicy
 type VerifyResourceStatusSpec struct {
 	ConstraintName  string         `json:"constraintName"`

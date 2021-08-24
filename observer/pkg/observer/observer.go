@@ -52,7 +52,6 @@ const defaultConfigKeyInConfigMap = "config.yaml"
 const defaultPodNamespace = "k8s-manifest-sigstore"
 const defaultObserverConfigName = "observer-config"
 const defaultObserverResultDetailConfigName = "verify-result-detail"
-const defaultHandlerConfigMapName = "request-handler-config"
 const logLevelEnvKey = "LOG_LEVEL"
 const k8sLogLevelEnvKey = "K8S_MANIFEST_SIGSTORE_LOG_LEVEL"
 
@@ -288,7 +287,6 @@ func (self *Inspector) Run() {
 	return
 }
 
-// TODO: need to check logic again
 func checkIfInscopeConstraint(constraintName string, tcconfig Rule) bool {
 	ignored := false
 	if len(tcconfig.Match) != 0 {
@@ -338,6 +336,20 @@ func exportVerifyResult(vrr vrres.VerifyResourceStatusSpec, ignored bool, violat
 		namespace = defaultPodNamespace
 	}
 
+	// label
+	vv := "false"
+	iv := "false"
+	if violated {
+		vv = "true"
+	}
+	if ignored {
+		iv = "true"
+	}
+	labels := map[string]string{
+		VerifyResourceViolationLabel: vv,
+		VerifyResourceIgnoreLabel:    iv,
+	}
+
 	obj, err := clientset.VerifyResourceStatuses(namespace).Get(context.Background(), vrr.ConstraintName, metav1.GetOptions{})
 	if err != nil || obj == nil {
 		log.Info("creating new VerifyResourceStatus resource...")
@@ -347,22 +359,8 @@ func exportVerifyResult(vrr vrres.VerifyResourceStatusSpec, ignored bool, violat
 			},
 			Spec: vrr,
 		}
-		// label
-		vv := "false"
-		iv := "false"
-		if violated {
-			vv = "true"
-		}
-		if ignored {
-			iv = "true"
-		}
 
-		labels := map[string]string{
-			VerifyResourceViolationLabel: vv,
-			VerifyResourceIgnoreLabel:    iv,
-		}
 		newVRR.Labels = labels
-
 		_, err = clientset.VerifyResourceStatuses(namespace).Create(context.Background(), newVRR, metav1.CreateOptions{})
 		if err != nil {
 			log.Error("failed to create VerifyResourceStatuses:", err.Error())
@@ -371,22 +369,7 @@ func exportVerifyResult(vrr vrres.VerifyResourceStatusSpec, ignored bool, violat
 	} else {
 		log.Info("updating VerifyResourceStatuses resource...")
 		obj.Spec = vrr
-		// label
-		vv := "false"
-		iv := "false"
-		if violated {
-			vv = "true"
-		}
-		if ignored {
-			iv = "true"
-		}
-
-		labels := map[string]string{
-			VerifyResourceViolationLabel: vv,
-			VerifyResourceIgnoreLabel:    iv,
-		}
 		obj.Labels = labels
-
 		_, err = clientset.VerifyResourceStatuses(namespace).Update(context.Background(), obj, metav1.UpdateOptions{})
 		if err != nil {
 			log.Error("failed to update VerifyResourceStatuses:", err.Error())
@@ -500,8 +483,7 @@ func (self *Inspector) getAPIResources(kubeconfig *rest.Config) error {
 func (self *Inspector) getAllResoucesByGroupResource(gResourceWithTargetNS groupResourceWithTargetNS) ([]unstructured.Unstructured, error) {
 	var resources []unstructured.Unstructured
 	var err error
-	var gResource groupResource
-	gResource = gResourceWithTargetNS.groupResource
+	gResource := gResourceWithTargetNS.groupResource
 	targetNSs := gResourceWithTargetNS.TargetNamespaces
 	namespaced := gResource.APIResource.Namespaced
 	gvr := schema.GroupVersionResource{
@@ -531,24 +513,6 @@ func (self *Inspector) getAllResoucesByGroupResource(gResourceWithTargetNS group
 		return []unstructured.Unstructured{}, nil
 	}
 	return resources, nil
-}
-
-func convertGVKToGVR(gvk schema.GroupVersionKind, apiResouces []groupResource) schema.GroupVersionResource {
-	found := schema.GroupVersionResource{}
-	for _, gResource := range apiResouces {
-		groupOk := (gResource.APIGroup == gvk.Group)
-		versionOK := (gResource.APIVersion == gvk.Version)
-		kindOk := (gResource.APIResource.Kind == gvk.Kind)
-		if groupOk && versionOK && kindOk {
-			found = schema.GroupVersionResource{
-				Group:    gvk.Group,
-				Version:  gvk.Version,
-				Resource: gResource.APIResource.Name,
-			}
-			break
-		}
-	}
-	return found
 }
 
 func loadObserverConfig() (ObserverConfig, error) {

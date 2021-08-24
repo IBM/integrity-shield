@@ -107,12 +107,11 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 
 	commonSkipUserMatched := false
 	skipObjectMatched := false
-	if rhconfig != nil {
-		//filter by user listed in common profile
-		commonSkipUserMatched = rhconfig.RequestFilterProfile.SkipUsers.Match(resource, req.AdmissionRequest.UserInfo.Username)
-		// skip object
-		skipObjectMatched = skipObjectsMatch(rhconfig.RequestFilterProfile.SkipObjects, resource)
-	}
+
+	//filter by user listed in common profile
+	commonSkipUserMatched = rhconfig.RequestFilterProfile.SkipUsers.Match(resource, req.AdmissionRequest.UserInfo.Username)
+	// skip object
+	skipObjectMatched = skipObjectsMatch(rhconfig.RequestFilterProfile.SkipObjects, resource)
 
 	// Proccess with parameter
 	//filter by user

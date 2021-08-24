@@ -146,15 +146,13 @@ func BuildDeploymentForIShieldServer(cr *apiv1alpha1.IntegrityShield) *appsv1.De
 // admission controller
 func BuildDeploymentForAdmissionController(cr *apiv1alpha1.IntegrityShield) *appsv1.Deployment {
 	labels := cr.Spec.MetaLabels
-	var servervolumemounts []v1.VolumeMount
-	var volumes []v1.Volume
 
-	volumes = []v1.Volume{
+	volumes := []v1.Volume{
 		SecretVolume("webhook-tls", cr.Spec.WebhookServerTlsSecretName),
 		EmptyDirVolume("tmp"),
 	}
 
-	servervolumemounts = []v1.VolumeMount{
+	servervolumemounts := []v1.VolumeMount{
 		{
 			MountPath: "/run/secrets/tls",
 			Name:      "webhook-tls",
@@ -276,8 +274,7 @@ func BuildDeploymentForAdmissionController(cr *apiv1alpha1.IntegrityShield) *app
 // Observer
 func BuildDeploymentForObserver(cr *apiv1alpha1.IntegrityShield) *appsv1.Deployment {
 	labels := cr.Spec.MetaLabels
-	var volumes []v1.Volume
-	volumes = []v1.Volume{
+	volumes := []v1.Volume{
 		EmptyDirVolume("tmp"),
 	}
 	servervolumemounts := []v1.VolumeMount{

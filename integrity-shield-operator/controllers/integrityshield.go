@@ -37,7 +37,6 @@ import (
 	admregv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -982,7 +981,7 @@ func (r *IntegrityShieldReconciler) isDeploymentAvailable(instance *apiv1alpha1.
 func (r *IntegrityShieldReconciler) createOrUpdateWebhookEvent(instance *apiv1alpha1.IntegrityShield, evtName, webhookName string) error {
 	ctx := context.Background()
 	evtNamespace := instance.Namespace
-	involvedObject := v1.ObjectReference{
+	involvedObject := corev1.ObjectReference{
 		Namespace:  evtNamespace,
 		APIVersion: instance.APIVersion,
 		Kind:       instance.Kind,
@@ -992,7 +991,7 @@ func (r *IntegrityShieldReconciler) createOrUpdateWebhookEvent(instance *apiv1al
 	evtSourceName := "IntegrityShield"
 	reason := "webhook-reconciled"
 	msg := fmt.Sprintf("[IntegrityShieldEvent] IntegrityShield reconciled MutatingWebhookConfiguration \"%s\"", webhookName)
-	expected := &v1.Event{
+	expected := &corev1.Event{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      evtName,
 			Namespace: evtNamespace,
@@ -1002,7 +1001,7 @@ func (r *IntegrityShieldReconciler) createOrUpdateWebhookEvent(instance *apiv1al
 		},
 		InvolvedObject:      involvedObject,
 		Type:                evtSourceName,
-		Source:              v1.EventSource{Component: evtSourceName},
+		Source:              corev1.EventSource{Component: evtSourceName},
 		ReportingController: evtSourceName,
 		ReportingInstance:   evtName,
 		Action:              evtName,
@@ -1013,7 +1012,7 @@ func (r *IntegrityShieldReconciler) createOrUpdateWebhookEvent(instance *apiv1al
 		Reason:              reason,
 		Count:               1,
 	}
-	found := &v1.Event{}
+	found := &corev1.Event{}
 
 	reqLogger := r.Log.WithValues(
 		"Instance.Name", instance.Name,
