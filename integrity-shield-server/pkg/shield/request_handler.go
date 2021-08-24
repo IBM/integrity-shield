@@ -95,7 +95,7 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 		"kind":      req.Kind.Kind,
 		"operation": req.Operation,
 		"userName":  req.UserInfo.Username,
-	}).Debug("Process new request")
+	}).Info("Process new request")
 
 	log.WithFields(log.Fields{
 		"namespace": req.Namespace,

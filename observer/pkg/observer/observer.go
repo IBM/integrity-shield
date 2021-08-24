@@ -176,17 +176,17 @@ func (self *Inspector) Run() {
 	// load config -> requestHandlerConfig
 	rhconfig, err := ishield.LoadRequestHandlerConfig()
 	if err != nil {
-		fmt.Println("Failed to load RequestHandlerConfig; err: ", err.Error())
+		log.Error("Failed to load RequestHandlerConfig; err: ", err.Error())
 	}
 	// load observer config
 	tcconfig, err := loadObserverConfig()
 	if err != nil {
-		fmt.Println("Failed to load Observer config; err: ", err.Error())
+		log.Error("Failed to load Observer config; err: ", err.Error())
 	}
 	// load constraints
 	constraints, err := self.loadConstraints()
 	if err != nil {
-		fmt.Println("Failed to load constraints; err: ", err.Error())
+		log.Error("Failed to load constraints; err: ", err.Error())
 	}
 	// ObservationDetailResults
 	var constraintResults []ConstraintResult
@@ -199,7 +199,7 @@ func (self *Inspector) Run() {
 		ignoreFields := constraint.Parameters.IgnoreFields
 		secrets := constraint.Parameters.KeyConfigs
 		if narrowedGVKList == nil {
-			fmt.Println("there is no resources to observe in the constraint:", constraint.Parameters.ConstraintName)
+			log.Info("there is no resources to observe in the constraint:", constraint.Parameters.ConstraintName)
 			return
 		}
 		// get all resources of extracted GVKs
@@ -266,7 +266,7 @@ func (self *Inspector) Run() {
 		}
 
 		// check if targeted constraint
-		ignored := checkIfInscopeConstraint(constraintName, tcconfig)
+		ignored := checkIfInscopeConstraint(constraintName, tcconfig.TargetConstraints)
 
 		// export VerifyResult
 		_ = exportVerifyResult(vrr, ignored, violated)
@@ -288,17 +288,12 @@ func (self *Inspector) Run() {
 	return
 }
 
-// TODO: need to check again
-func checkIfInscopeConstraint(constraintName string, tcconfig *ObserverConfig) bool {
-	if tcconfig == nil {
-		return false
-	}
+// TODO: need to check logic again
+func checkIfInscopeConstraint(constraintName string, tcconfig Rule) bool {
 	ignored := false
-	if len(tcconfig.TargetConstraints.Match) == 0 {
-		ignored = false
-	} else {
+	if len(tcconfig.Match) != 0 {
 		match := false
-		for _, p := range tcconfig.TargetConstraints.Match {
+		for _, p := range tcconfig.Match {
 			included := MatchPattern(p, constraintName)
 			if included {
 				match = true
@@ -310,9 +305,9 @@ func checkIfInscopeConstraint(constraintName string, tcconfig *ObserverConfig) b
 			ignored = true
 		}
 	}
-	if !ignored && len(tcconfig.TargetConstraints.Exclude) != 0 {
+	if !ignored && len(tcconfig.Exclude) != 0 {
 		match := false
-		for _, p := range tcconfig.TargetConstraints.Exclude {
+		for _, p := range tcconfig.Exclude {
 			excluded := MatchPattern(p, constraintName)
 			if excluded {
 				match = true
@@ -401,8 +396,7 @@ func exportVerifyResult(vrr vrres.VerifyResourceStatusSpec, ignored bool, violat
 	return nil
 }
 
-// TODO: fix param
-func exportResultDetail(results ObservationDetailResults, oconfig *ObserverConfig) error {
+func exportResultDetail(results ObservationDetailResults, oconfig ObserverConfig) error {
 	if !oconfig.ExportDetailResult {
 		return nil
 	}
@@ -414,12 +408,10 @@ func exportResultDetail(results ObservationDetailResults, oconfig *ObserverConfi
 	if namespace == "" {
 		namespace = defaultPodNamespace
 	}
-
 	configName := oconfig.ResultDetailConfigName
 	if configName == "" {
 		configName = defaultObserverResultDetailConfigName
 	}
-
 	configKey := oconfig.ResultDetailConfigKey
 	if configKey == "" {
 		configKey = defaultConfigKeyInConfigMap
@@ -535,7 +527,7 @@ func (self *Inspector) getAllResoucesByGroupResource(gResourceWithTargetNS group
 	}
 	if err != nil {
 		// ignore RBAC error - IShield SA
-		fmt.Println("RBAC error when listing resources; error:", err.Error())
+		log.Error("RBAC error when listing resources; error:", err.Error())
 		return []unstructured.Unstructured{}, nil
 	}
 	return resources, nil
@@ -559,7 +551,8 @@ func convertGVKToGVR(gvk schema.GroupVersionKind, apiResouces []groupResource) s
 	return found
 }
 
-func loadObserverConfig() (*ObserverConfig, error) {
+func loadObserverConfig() (ObserverConfig, error) {
+	var empty ObserverConfig
 	namespace := os.Getenv("POD_NAMESPACE")
 	if namespace == "" {
 		namespace = defaultPodNamespace
@@ -575,27 +568,30 @@ func loadObserverConfig() (*ObserverConfig, error) {
 
 	config, err := kubeutil.GetKubeConfig()
 	if err != nil {
-		return nil, err
+		return empty, err
 	}
 	clientset, err := kubeclient.NewForConfig(config)
 	if err != nil {
 		log.Error(err)
-		return nil, err
+		return empty, err
 	}
 	cm, err := clientset.CoreV1().ConfigMaps(namespace).Get(context.Background(), configName, metav1.GetOptions{})
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("failed to get a configmap `%s` in `%s` namespace", configName, namespace))
+		return empty, errors.Wrap(err, fmt.Sprintf("failed to get a configmap `%s` in `%s` namespace", configName, namespace))
 	}
 	cfgBytes, found := cm.Data[configKey]
 	if !found {
-		return nil, errors.New(fmt.Sprintf("`%s` is not found in configmap", configKey))
+		return empty, errors.New(fmt.Sprintf("`%s` is not found in configmap", configKey))
 	}
 	var tr *ObserverConfig
 	err = yaml.Unmarshal([]byte(cfgBytes), &tr)
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("failed to unmarshal config.yaml into %T", tr))
+		return empty, errors.Wrap(err, fmt.Sprintf("failed to unmarshal config.yaml into %T", tr))
 	}
-	return tr, nil
+	if tr == nil {
+		return empty, nil
+	}
+	return *tr, nil
 }
 
 func LoadKeySecret(keySecertNamespace, keySecertName string) (string, error) {
@@ -696,9 +692,10 @@ func (self *Inspector) getPossibleProtectedGVKs(match MatchCondition) []groupRes
 	return possibleProtectedGVKs
 }
 
+// TODO: check logic
 func checkIfRuleMatchWithGVK(match MatchCondition, apiResource groupResource) (bool, []groupResourceWithTargetNS) {
 	possibleProtectedGVKs := []groupResourceWithTargetNS{}
-	// need to support "selector label"
+	// TODO: support "LabelSelector"
 	if len(match.Kinds) == 0 {
 		return false, nil
 	}
@@ -716,16 +713,9 @@ func checkIfRuleMatchWithGVK(match MatchCondition, apiResource groupResource) (b
 		} else {
 			kmatch = true
 		}
-		log.WithFields(log.Fields{
-			"MatchRule.kinds.ApiGroups": agmatch,
-			"MatchRule.kinds.Kinds":     kmatch,
-			"APIGroup":                  apiResource.APIGroup,
-			"Kind":                      apiResource.APIResource.Kind,
-		}).Debug("check match condition")
 		if kmatch && agmatch {
 			matched = true
 			namespaces := match.Namespaces
-			// need to support namespace selector
 			if match.NamespaceSelector != nil {
 				labeledNS := getLabelMatchedNamespace(match.NamespaceSelector)
 				namespaces = append(namespaces, labeledNS...)
@@ -785,7 +775,6 @@ func getLabelMatchedNamespace(labelSelector *metav1.LabelSelector) []string {
 			matchedNs = append(matchedNs, ns.Name)
 		}
 	}
-
 	return matchedNs
 }
 
