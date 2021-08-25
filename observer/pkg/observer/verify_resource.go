@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-func InspectResources(resources []unstructured.Unstructured, imageRef string, ignoreFields k8smanifest.ObjectFieldBindingList, secrets []k8smnfconfig.KeyConfig) []VerifyResultDetail {
+func ObserveResources(resources []unstructured.Unstructured, imageRef string, ignoreFields k8smanifest.ObjectFieldBindingList, secrets []k8smnfconfig.KeyConfig) []VerifyResultDetail {
 	results := []VerifyResultDetail{}
 	for _, resource := range resources {
 		log.Debug("Observed Resource:", resource.GetAPIVersion(), resource.GetKind(), resource.GetNamespace(), resource.GetName())

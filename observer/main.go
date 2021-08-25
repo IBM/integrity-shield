@@ -24,10 +24,10 @@ import (
 )
 
 func main() {
-	insp := observer.NewInspector()
+	insp := observer.NewObserver()
 	err := insp.Init()
 	if err != nil {
-		fmt.Println("Failed to initialize Inspector; err: ", err.Error())
+		fmt.Println("Failed to initialize Observer; err: ", err.Error())
 		return
 	}
 	intervalInt, _ := strconv.Atoi(os.Getenv("INTERVAL"))

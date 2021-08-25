@@ -60,7 +60,7 @@ const k8sLogLevelEnvKey = "K8S_MANIFEST_SIGSTORE_LOG_LEVEL"
 const VerifyResourceViolationLabel = "integrityshield.io/verifyResourceViolation"
 const VerifyResourceIgnoreLabel = "integrityshield.io/verifyResourceIgnored"
 
-type Inspector struct {
+type Observer struct {
 	APIResources []groupResource
 
 	dynamicClient dynamic.Interface
@@ -132,12 +132,12 @@ var logLevelMap = map[string]log.Level{
 	"trace": log.TraceLevel,
 }
 
-func NewInspector() *Inspector {
-	insp := &Inspector{}
+func NewObserver() *Observer {
+	insp := &Observer{}
 	return insp
 }
 
-func (self *Inspector) Init() error {
+func (self *Observer) Init() error {
 	log.Info("init Observer....")
 	kubeconf, _ := kubeutil.GetKubeConfig()
 
@@ -171,7 +171,7 @@ func (self *Inspector) Init() error {
 	return nil
 }
 
-func (self *Inspector) Run() {
+func (self *Observer) Run() {
 	// load config -> requestHandlerConfig
 	rhconfig, err := ishield.LoadRequestHandlerConfig()
 	if err != nil {
@@ -210,7 +210,7 @@ func (self *Inspector) Run() {
 
 		// check all resources by verifyResource
 		ignoreFields = append(ignoreFields, rhconfig.RequestFilterProfile.IgnoreFields...)
-		results := InspectResources(resources, constraint.Parameters.ImageRef, ignoreFields, secrets)
+		results := ObserveResources(resources, constraint.Parameters.ImageRef, ignoreFields, secrets)
 		for _, res := range results {
 			// simple result
 
@@ -445,7 +445,7 @@ func exportResultDetail(results ObservationDetailResults, oconfig ObserverConfig
 	return nil
 }
 
-func (self *Inspector) getAPIResources(kubeconfig *rest.Config) error {
+func (self *Observer) getAPIResources(kubeconfig *rest.Config) error {
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(kubeconfig)
 	if err != nil {
 		return err
@@ -480,7 +480,7 @@ func (self *Inspector) getAPIResources(kubeconfig *rest.Config) error {
 	return nil
 }
 
-func (self *Inspector) getAllResoucesByGroupResource(gResourceWithTargetNS groupResourceWithTargetNS) ([]unstructured.Unstructured, error) {
+func (self *Observer) getAllResoucesByGroupResource(gResourceWithTargetNS groupResourceWithTargetNS) ([]unstructured.Unstructured, error) {
 	var resources []unstructured.Unstructured
 	var err error
 	gResource := gResourceWithTargetNS.groupResource
@@ -613,7 +613,7 @@ type Kinds struct {
 	ApiGroups []string `json:"apiGroups,omitempty"`
 }
 
-func (self *Inspector) loadConstraints() ([]ConstraintSpec, error) {
+func (self *Observer) loadConstraints() ([]ConstraintSpec, error) {
 	gvr := schema.GroupVersionResource{
 		Group:    "constraints.gatekeeper.sh",
 		Version:  "v1beta1",
@@ -644,7 +644,7 @@ func (self *Inspector) loadConstraints() ([]ConstraintSpec, error) {
 	return micList, nil
 }
 
-func (self *Inspector) getPossibleProtectedGVKs(match MatchCondition) []groupResourceWithTargetNS {
+func (self *Observer) getPossibleProtectedGVKs(match MatchCondition) []groupResourceWithTargetNS {
 	possibleProtectedGVKs := []groupResourceWithTargetNS{}
 	for _, apiResource := range self.APIResources {
 		matched, tmpGvks := checkIfRuleMatchWithGVK(match, apiResource)
