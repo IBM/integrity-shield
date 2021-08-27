@@ -4,7 +4,6 @@ go 1.16
 
 require (
 	github.com/IBM/integrity-shield/integrity-shield-server v0.0.0-00010101000000-000000000000
-	github.com/ghodss/yaml v1.0.0
 	github.com/pkg/errors v0.9.1
 	github.com/sigstore/k8s-manifest-sigstore v0.0.0-20210820081408-1767e96c5fe2
 	github.com/sirupsen/logrus v1.8.1
