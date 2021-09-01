@@ -112,6 +112,7 @@ func MatchPattern(pattern, value string) bool {
 	}
 }
 
+// exclude from observation
 func CheckIfIgnoredConstraint(constraintName string, aconfigs []ActionConfig) bool {
 	matched := []bool{}
 	for _, conf := range aconfigs {
@@ -129,6 +130,7 @@ func CheckIfIgnoredConstraint(constraintName string, aconfigs []ActionConfig) bo
 	return ignored
 }
 
+// not block even if invalid request
 func CheckIfEnforceConstraint(constraintName string, aconfigs []ActionConfig) bool {
 	matched := []bool{}
 	for _, conf := range aconfigs {

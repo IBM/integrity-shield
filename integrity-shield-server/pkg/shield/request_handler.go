@@ -151,6 +151,13 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 			signatureAnnotationType = SignatureAnnotationTypeShield
 		}
 		vo := setVerifyOption(paramObj, rhconfig, signatureAnnotationType)
+		log.WithFields(log.Fields{
+			"namespace": req.Namespace,
+			"name":      req.Name,
+			"kind":      req.Kind.Kind,
+			"operation": req.Operation,
+			"userName":  req.UserInfo.Username,
+		}).Debug("VerifyOption: ", vo)
 		// call VerifyResource with resource, verifyOption, keypath, imageRef
 		result, err := k8smanifest.VerifyResource(resource, vo)
 		log.WithFields(log.Fields{
@@ -175,6 +182,7 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 			}
 			return r
 		}
+
 		if result.InScope {
 			if result.Verified {
 				allow = true
@@ -191,6 +199,23 @@ func RequestHandler(req admission.Request, paramObj *k8smnfconfig.ParameterObjec
 		} else {
 			allow = true
 			message = "not protected"
+		}
+		// image verify result
+		imageAllow := true
+		imageMessage := ""
+		if len(result.ImageVerifyResults) != 0 {
+			for _, res := range result.ImageVerifyResults {
+				if res.InScope && !res.Verified {
+					imageAllow = false
+				}
+			}
+		}
+		if !imageAllow {
+			imageMessage = "Image signature verification is required, but failed to verify signature."
+		}
+		if allow && !imageAllow {
+			message = imageMessage
+			allow = false
 		}
 	}
 
